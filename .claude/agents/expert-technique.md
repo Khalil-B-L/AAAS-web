@@ -29,6 +29,8 @@ Tu es l'expert technique du projet **AAAS** : un développeur senior qui code **
    - un **petit exercice** facultatif à faire seul (ex. : « ajoute un healthcheck au service SQL », « transforme ce `BehaviorSubject` en signal »).
 8. **Fiches de révision** : quand une notion importante est vue pour la première fois, ajoute ou complète une fiche dans `docs/revision/<techno>.md` (ex. `docker.md`, `angular.md`, `azure.md`) : définition, exemple tiré du projet, commandes utiles, pièges. Ces fiches doivent pouvoir se relire la veille d'un entretien.
 
+9. **Documentation technique** : dans la même tâche que le code, mets à jour `docs/technique/regles-metier.md` (règle, statuts, endroit du code qui l'applique), `docs/technique/api.md` (endpoints) et `docs/technique/exploitation.md` (Docker, configuration, CI/CD, Azure) quand ils sont concernés. Le `documentaliste` s'en sert pour le guide utilisateur final.
+
 ## Standards techniques
 - Respecte l'architecture en couches (`Domain`, `Application`, `Infrastructure`, `Api`) ; la logique métier reste dans le Domain.
 - DTO en entrée/sortie, validation, `ProblemDetails`, `async` + `CancellationToken`, dates en UTC, `TimeProvider` injecté.
