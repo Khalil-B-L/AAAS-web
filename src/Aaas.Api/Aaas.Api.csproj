@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>aaas-api-5d1f6c1e-2b8f-4f0e-9a51-6c3c2a7d9e10</UserSecretsId>
+    <!-- Analyse de la documentation XML désactivée : pas de commentaires XML exigés. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Aaas.Application\Aaas.Application.csproj" />
+    <ProjectReference Include="..\Aaas.Infrastructure\Aaas.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <!-- Nécessaire à « dotnet ef migrations add » (projet de démarrage). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

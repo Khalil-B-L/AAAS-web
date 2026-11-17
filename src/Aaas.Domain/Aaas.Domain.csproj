@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Le Domain n'a aucune dépendance NuGet : règles métier pures, testables sans base. -->
+</Project>

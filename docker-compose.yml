@@ -1,0 +1,64 @@
+# Lancement local : copier .env.example en .env, le compléter, puis « docker compose up --build ».
+# Le nom du projet préfixe les conteneurs, le réseau et les volumes (aaas-sqlserver-1, aaas_sqlserver-data...).
+name: aaas
+
+services:
+  sqlserver:
+    # Tag précis (CU + GDR + OS) plutôt que 2022-latest, qui change de contenu à chaque mise à jour.
+    # Même tag que tests/Aaas.Api.IntegrationTests/Support/SqlServerFixture.cs.
+    image: mcr.microsoft.com/mssql/server:2022-CU27-GDR2-ubuntu-22.04
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      # « :? » fait échouer compose avec ce message si la variable est absente OU vide dans .env.
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Renseignez MSSQL_SA_PASSWORD dans .env (valeur aléatoire, voir .env.example)}
+    ports:
+      # IP_hôte:port_hôte:port_conteneur. 127.0.0.1 : accessible depuis ce poste seulement (SSMS, « dotnet run »),
+      # pas depuis le réseau local. Sans IP, Docker écouterait sur 0.0.0.0 (toutes les interfaces).
+      - "127.0.0.1:1433:1433"
+    volumes:
+      # Les fichiers de base survivent à « docker compose down » (pas à « down -v »).
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      # $$ échappe le $ pour compose : la variable est lue par le shell du conteneur, pas au moment du parsing.
+      # -C : faire confiance au certificat auto-signé du conteneur ; -b : code retour non nul en cas d'erreur SQL.
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -b -Q \"SELECT 1\" -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      # Pendant ce délai, les échecs ne comptent pas : SQL Server met 15 à 30 s à démarrer.
+      start_period: 30s
+
+  api:
+    # Image construite localement ; contexte = racine du dépôt (le Dockerfile a besoin des Directory.*.props).
+    build:
+      context: .
+      dockerfile: src/Aaas.Api/Dockerfile
+    image: aaas-api:local
+    depends_on:
+      sqlserver:
+        # Attendre que le healthcheck SQL soit vert, pas seulement que le conteneur soit lancé.
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      # « __ » remplace « : » des clés .NET. Le serveur s'appelle « sqlserver » : nom du service sur le réseau compose.
+      ConnectionStrings__Default: "Server=sqlserver,1433;Database=Aaas;User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Renseignez JWT_SIGNING_KEY dans .env (valeur aléatoire, voir .env.example)}
+      Database__MigrateOnStartup: "true"
+      Cors__AllowedOrigins__0: http://localhost:4200
+      # E-mail et mot de passe obligatoires pour compose : sans eux, l'API démarrerait sans admin (simple avertissement).
+      # Pas d'e-mail par défaut : une adresse publiée pourrait être prise par un tiers via l'inscription (ADR 0008).
+      # Une fois l'admin créé, ces valeurs ne sont plus lues (mais doivent rester renseignées).
+      Bootstrap__AdminEmail: ${BOOTSTRAP_ADMIN_EMAIL:?Renseignez BOOTSTRAP_ADMIN_EMAIL dans .env (adresse non publiée, voir .env.example)}
+      Bootstrap__AdminPassword: ${BOOTSTRAP_ADMIN_PASSWORD:?Renseignez BOOTSTRAP_ADMIN_PASSWORD dans .env (valeur aléatoire, voir .env.example)}
+      Bootstrap__AdminFirstName: ${BOOTSTRAP_ADMIN_FIRSTNAME:-}
+      Bootstrap__AdminLastName: ${BOOTSTRAP_ADMIN_LASTNAME:-}
+      Bootstrap__AdminPhone: ${BOOTSTRAP_ADMIN_PHONE:-}
+      # « :- » : valeur par défaut si absente ou vide (ici false, la promotion doit être demandée explicitement).
+      Bootstrap__PromoteExistingAccount: ${BOOTSTRAP_PROMOTE_EXISTING_ACCOUNT:-false}
+    ports:
+      - "127.0.0.1:8080:8080"
+    # Pas de healthcheck ici : l'image aspnet ne contient ni curl ni wget (voir docs/revision/docker.md).
+
+volumes:
+  sqlserver-data:

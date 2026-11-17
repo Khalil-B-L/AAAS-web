@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- Les avertissements de nullabilité sont des bugs en puissance : on les traite comme des erreurs (ADR 0001). -->
+    <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- CA1707 (soulignés dans les noms de tests), CA1848 (LoggerMessage) : bruit inutile pour ce projet. -->
+    <NoWarn>$(NoWarn);CA1707;CA1848;CA1515</NoWarn>
+  </PropertyGroup>
+</Project>

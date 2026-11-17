@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Aaas.Api/Aaas.Api.csproj" />
+    <Project Path="src/Aaas.Application/Aaas.Application.csproj" />
+    <Project Path="src/Aaas.Domain/Aaas.Domain.csproj" />
+    <Project Path="src/Aaas.Infrastructure/Aaas.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Aaas.Api.IntegrationTests/Aaas.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Aaas.Application.Tests/Aaas.Application.Tests.csproj" />
+    <Project Path="tests/Aaas.Domain.Tests/Aaas.Domain.Tests.csproj" />
+    <Project Path="tests/Aaas.Infrastructure.Tests/Aaas.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

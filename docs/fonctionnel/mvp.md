@@ -1,7 +1,7 @@
 # Cadrage fonctionnel du MVP — AAAS
 
 > Rédigé par l'expert fonctionnel. Document de référence pour l'agent `architecte` (choix techniques) et l'agent `testeur` (les scénarios Gherkin servent de base aux tests).
-> Statut : **proposition, version 2**, mise à jour avec les décisions du porteur de projet. Les valeurs par défaut marquées *(défaut)* sont à confirmer avec l'association (voir § 4).
+> Statut : **proposition, version 3**, mise à jour avec les décisions du porteur de projet. Les valeurs par défaut marquées *(défaut)* sont à confirmer avec l'association (voir § 5).
 
 ### Décisions du porteur de projet (version 2)
 - L'association est en **Tunisie**. L'application est **en français uniquement**.
@@ -10,6 +10,23 @@
 - Les événements peuvent être **payants**, avec un **paiement hors ligne uniquement** (en main propre) : prix optionnel en dinars (TND), réservation marquée « payée » par l'administrateur, aucun remboursement géré dans l'application.
 - Heure de référence : **heure de Tunis** (Africa/Tunis, UTC+1, pas de changement d'heure).
 - Protection des données : **loi organique tunisienne n° 2004-63 du 27 juillet 2004** (autorité de contrôle : **INPDP**), dans une version minimale.
+
+### Décisions du porteur de projet (version 3, cahier des charges v1.1)
+- **Données du compte** : on conserve aussi la **date de création** du compte et la **date de dernière connexion** (nécessaires à US-F3 et à R25).
+- **Téléphone** : seuls les numéros tunisiens **+216 suivi de 8 chiffres** sont acceptés. Pas de saisie locale sans préfixe, pas de préfixe 00, pas de numéro international.
+- **Mineurs** : aucune case à cocher ni contrôle dédié ; le site est accessible à tout le monde. La mention « inscription réservée aux majeurs » est abandonnée.
+- **Consentement** : on conserve la **version de la politique de confidentialité acceptée**, avec la date d'acceptation.
+
+### Correspondance du vocabulaire (cahier des charges / ce document)
+
+| Cahier des charges | Ce document | Dans le code (indication de l'architecte) |
+|---|---|---|
+| Membre | Utilisateur | rôle `User` |
+| Annulée par le membre | Annulée par l'utilisateur | statut `CancelledByUser` |
+| Administrateur | Administrateur | rôle `Admin` |
+| RG-xx (règles obligatoires, § 5.2 du cahier) | R-xx (règles détaillées, § 4 ci-dessous) | — |
+
+Correspondance des règles : RG-01 = R2, RG-02 = R5 et R7, RG-03 = R4, RG-04 = R6, RG-05 = R9, RG-06 = R11, RG-07 = R14 et R15, RG-08 = R12 et R13, RG-09 = R22, RG-10 = R8, RG-11 = R20. En cas de contradiction, le cahier des charges fait foi.
 
 ---
 
@@ -70,7 +87,7 @@ Les scénarios sont écrits en Gherkin français. Toutes les heures sont en heur
 
 ### Épique A — Comptes et authentification
 
-#### US-A1 — Créer un compte *(modifiée : téléphone)*
+#### US-A1 — Créer un compte *(modifiée : téléphone tunisien uniquement, date de création)*
 > En tant que **visiteur**, je veux **créer un compte avec mon e-mail, mon téléphone et un mot de passe** afin de **pouvoir demander des places**.
 
 ```gherkin
@@ -82,6 +99,7 @@ Fonctionnalité: Création de compte
     Et que je coche la case d'acceptation de la politique de confidentialité
     Et que je valide
     Alors mon compte est créé avec le rôle "Utilisateur"
+    Et la date de création du compte est enregistrée
     Et je suis connecté
 
   Scénario: E-mail déjà utilisé
@@ -90,8 +108,23 @@ Fonctionnalité: Création de compte
     Alors le compte n'est pas créé
     Et un message m'indique qu'un compte existe déjà avec cet e-mail
 
+  Scénario: Numéro tunisien valide
+    Quand je crée un compte avec le téléphone "+216 20 123 456" ou "+21620123456"
+    Alors le compte est créé
+
   Scénario: Numéro de téléphone invalide
     Quand je crée un compte avec le téléphone "12 34"
+    Alors le compte n'est pas créé
+    Et un message m'indique le format attendu, par exemple "+216 20 123 456"
+
+  Scénario: Formats de numéro refusés
+    Quand je crée un compte avec l'un de ces téléphones :
+      | téléphone         | raison                                 |
+      | 20 123 456        | saisie locale sans le préfixe +216     |
+      | 0021620123456     | préfixe 00 non accepté                 |
+      | +33 6 12 34 56 78 | numéro international non tunisien      |
+      | +216 20 123 45    | moins de 8 chiffres après +216         |
+      | +216 20 123 4567  | plus de 8 chiffres après +216          |
     Alors le compte n'est pas créé
     Et un message m'indique le format attendu, par exemple "+216 20 123 456"
 
@@ -111,7 +144,7 @@ Fonctionnalité: Création de compte
     Et le champ en erreur est signalé
 ```
 
-#### US-A2 — Se connecter
+#### US-A2 — Se connecter *(modifiée : date de dernière connexion)*
 > En tant qu'**utilisateur ou administrateur**, je veux **me connecter avec mon e-mail et mon mot de passe** afin d'**accéder à mon espace**.
 
 ```gherkin
@@ -122,11 +155,13 @@ Fonctionnalité: Connexion
     Quand je me connecte avec cet e-mail et le bon mot de passe
     Alors je suis connecté
     Et j'accède aux fonctions de mon rôle
+    Et la date de ma dernière connexion est mise à jour
 
   Scénario: Identifiants incorrects
     Quand je me connecte avec un mauvais mot de passe ou un e-mail inconnu
     Alors je ne suis pas connecté
     Et le message est le même dans les deux cas : "E-mail ou mot de passe incorrect"
+    Et la date de dernière connexion n'est pas modifiée
 
   Scénario: Trop de tentatives
     Étant donné que j'ai échoué 5 fois de suite à me connecter
@@ -767,7 +802,7 @@ Fonctionnalité: Numéro de contact
 
 Version minimale, sans analyse juridique : consentement, données minimales, suppression du compte. Autorité de contrôle : **INPDP** (Instance nationale de protection des données personnelles).
 
-#### US-F1 — Être informé et consentir *(modifiée : loi tunisienne)*
+#### US-F1 — Être informé et consentir *(modifiée : version de la politique, pas de contrôle d'âge)*
 > En tant que **visiteur**, je veux **savoir quelles données sont collectées et pourquoi** afin de **donner mon accord en connaissance de cause**.
 
 ```gherkin
@@ -782,9 +817,17 @@ Fonctionnalité: Information et consentement
   Scénario: Consentement enregistré
     Quand je crée un compte en acceptant la politique
     Alors la date de mon acceptation est conservée
+    Et la version de la politique que j'ai acceptée est conservée avec cette date
+
+  Scénario: Aucun contrôle d'âge
+    Quand je crée un compte
+    Alors aucune case ni question sur mon âge ne m'est posée
+    Et le site reste accessible à tout le monde
 ```
 
-#### US-F2 — Supprimer mon compte *(modifiée : nouveaux statuts)*
+La « version » de la politique est un simple repère (par exemple « 1.0 » ou sa date de publication) qui change chaque fois que le texte de la politique change. Redemander l'accord aux membres déjà inscrits quand la politique change n'est **pas** au MVP (voir Q16).
+
+#### US-F2 — Supprimer mon compte *(modifiée : nouveaux statuts, nouvelles données)*
 > En tant qu'**utilisateur**, je veux **supprimer mon compte** afin que **mes données personnelles soient effacées**.
 
 ```gherkin
@@ -794,7 +837,7 @@ Fonctionnalité: Suppression de compte
     Étant donné que je suis connecté et que j'ai 1 demande en attente et 1 réservation confirmée à venir
     Quand je supprime mon compte et que je confirme
     Alors ces 2 réservations passent à "Annulée par l'utilisateur" et les places sont libérées
-    Et mes données personnelles (prénom, nom, e-mail, téléphone) sont effacées
+    Et mes données personnelles (prénom, nom, e-mail, téléphone, dates de création et de dernière connexion, consentement) sont effacées
     Et je suis déconnecté
     Et je ne peux plus me connecter avec cet e-mail
 
@@ -825,7 +868,7 @@ Fonctionnalité: Suppression de compte
     Alors mon compte n'est pas supprimé
 ```
 
-#### US-F3 — Voir mes données
+#### US-F3 — Voir mes données *(modifiée : dates et version de la politique)*
 > En tant qu'**utilisateur**, je veux **voir les informations que l'association détient sur moi** afin d'**exercer mon droit d'accès**.
 
 ```gherkin
@@ -833,7 +876,7 @@ Fonctionnalité: Mon profil
 
   Scénario: Consultation du profil
     Quand j'ouvre "Mon compte"
-    Alors je vois mon prénom, mon nom, mon e-mail, mon téléphone, la date de création du compte et la date de mon consentement
+    Alors je vois mon prénom, mon nom, mon e-mail, mon téléphone, la date de création du compte, la date de mon consentement et la version de la politique que j'ai acceptée
     Et j'accède à mes réservations
 ```
 
@@ -862,12 +905,12 @@ Fonctionnalité: Mon profil
 | R17 | Notifications | Aucun e-mail ni SMS automatique au MVP : les statuts sont visibles dans l'application et le contact se fait par téléphone ou WhatsApp *(défaut)*. |
 | R18 | Actualités | Brouillon / Publiée. Triées par date de publication décroissante, **10 par page** *(défaut)*. Suppression définitive autorisée. Texte simple, sans image au MVP *(défaut)*. |
 | R19 | Affichage public des événements | Seuls les événements **à venir** sont listés, avec leur prix et leurs places restantes. Pas d'archive des événements passés au MVP *(défaut)*. |
-| R20 | Données d'un compte | **Prénom, nom, e-mail, téléphone, mot de passe**, date du consentement. Rien d'autre. Le téléphone est **obligatoire** car il sert au contact avant la confirmation *(défaut, à confirmer en Q8)*. Format accepté : numéro tunisien (+216 suivi de 8 chiffres) ou numéro international. L'e-mail est unique, sans tenir compte des majuscules. |
+| R20 | Données d'un compte | **Prénom, nom, e-mail, téléphone, mot de passe** (conservé uniquement sous forme hachée), plus : la **date de création du compte** (affichée à l'utilisateur, US-F3) ; la **date de dernière connexion** (pour repérer les comptes inactifs depuis 3 ans, R25) ; le **consentement** (date d'acceptation et **version de la politique de confidentialité acceptée**, R24). Aucune autre donnée : en particulier ni date de naissance ni information d'âge. Le téléphone est **obligatoire** car il sert au contact avant la confirmation *(à confirmer en Q8)*. Format accepté : **uniquement « +216 » suivi de exactement 8 chiffres** (exemple : +216 20 123 456). Refusés : saisie locale sans préfixe, préfixe « 00 », numéros internationaux. Les espaces de présentation sont tolérés à la saisie *(défaut)*. L'e-mail est unique, sans tenir compte des majuscules. |
 | R21 | Mot de passe et connexion | Au moins **8 caractères**, dont une lettre et un chiffre *(défaut)*. Blocage **15 min après 5 échecs** *(défaut)*. Pas de vérification de l'e-mail au MVP *(défaut)*. |
 | R22 | Administrateurs | Pas d'inscription en tant qu'admin : le **premier admin est créé à l'installation**, les suivants sont désignés manuellement au MVP. Il doit toujours rester **au moins un admin**. |
 | R23 | Suppression de compte | Immédiate et définitive. Les réservations à venir (En attente ou Confirmées) sont **annulées** et leurs places libérées. Les autres réservations sont **rendues anonymes**. |
-| R24 | Protection des données | Cadre : **loi organique tunisienne n° 2004-63 du 27 juillet 2004**, autorité **INPDP**. Minimum retenu : consentement explicite à l'inscription, données minimales (R20), suppression du compte (R23), consultation de ses données (US-F3). |
-| R25 | Conservation des données | Un compte inactif depuis **3 ans** est à supprimer *(défaut ; traitement manuel ou plus tard)*. |
+| R24 | Protection des données | Cadre : **loi organique tunisienne n° 2004-63 du 27 juillet 2004**, autorité **INPDP**. Minimum retenu : consentement explicite à l'inscription, avec conservation de la date et de la **version de la politique acceptée** ; aucun contrôle d'âge dédié (le site est accessible à tout le monde) ; données minimales (R20) ; suppression du compte (R23) ; consultation de ses données (US-F3). |
+| R25 | Conservation des données | Un compte inactif depuis **3 ans** (mesuré avec la date de dernière connexion, ou à défaut la date de création) est à supprimer *(défaut ; traitement manuel ou plus tard)*. |
 | R26 | Heure de référence | Toutes les dates et heures sont en **heure de Tunis (Africa/Tunis, UTC+1, sans changement d'heure)**. |
 | R27 | Langue | Application **en français uniquement**. |
 
@@ -880,6 +923,7 @@ Fonctionnalité: Mon profil
 - Lien d'appel et lien WhatsApp à partir du numéro de contact (US-D4), et stockage de ce paramètre (US-E8).
 - Anonymisation des réservations lors de la suppression d'un compte (R23).
 - Création du premier administrateur à l'installation (R22).
+- Stockage de `CreatedAt`, `LastLoginAt` et de la version de la politique acceptée (R20) ; mise à jour de `LastLoginAt` à la connexion (US-A2) ; règle de validation du téléphone « +216 + 8 chiffres » (R20).
 
 ---
 
@@ -894,7 +938,7 @@ Fonctionnalité: Mon profil
 | Q5 | Faut-il une **liste d'attente** quand c'est complet ? | Non au MVP. |
 | Q6 | Faut-il des **notifications automatiques** (e-mail ou SMS) quand une demande est confirmée, refusée ou expirée ? | Non au MVP. |
 | Q7 | Si un événement **change de date**, garde-t-on les inscrits ou les désinscrit-on ? | On garde les inscrits, l'association les prévient. |
-| Q8 | Le **téléphone** de l'utilisateur doit-il être **obligatoire** ou facultatif ? Faut-il d'autres informations ? Des **mineurs** peuvent-ils s'inscrire ? | Téléphone obligatoire ; rien d'autre ; inscription réservée aux personnes majeures (mentionné dans la politique). |
+| Q8 | Le **téléphone** de l'utilisateur doit-il être **obligatoire** ou facultatif ? Faut-il d'autres informations ? Des **mineurs** peuvent-ils s'inscrire ? | Téléphone obligatoire, au format +216 + 8 chiffres uniquement ; autres données : seulement les dates de création et de dernière connexion et le consentement (R20). **Mineurs : tranché par le porteur, aucun contrôle ni case dédiés, le site est accessible à tout le monde** (la mention « réservé aux majeurs » est abandonnée). |
 | Q9 | Le **numéro de contact** est-il le même pour tous les événements, ou faut-il un numéro par événement ou par responsable ? | Un seul numéro pour l'association. |
 | Q10 | Le **nombre de places restantes** peut-il être affiché publiquement ? | Oui. |
 | Q11 | **Combien d'administrateurs**, et qui ? | 1 à 3 bénévoles désignés par le bureau. |
@@ -902,6 +946,8 @@ Fonctionnalité: Mon profil
 | Q13 | Qui rédige la **politique de confidentialité**, et quel est le **contact** pour les questions sur les données ? | Un modèle simple fourni avec l'application ; contact : l'e-mail de l'association. |
 | Q14 | Combien de temps **garder** les comptes inactifs et l'historique des réservations ? | 3 ans d'inactivité ; historique rendu anonyme et conservé. |
 | Q15 | Les actualités ont-elles besoin d'**images** ou de pièces jointes ? Faut-il **archiver** les événements passés ? | Non au MVP. |
+| Q16 | Quand la **politique de confidentialité change**, faut-il redemander l'accord aux membres déjà inscrits ? | Non au MVP : on conserve seulement la version acceptée à l'inscription ; à revoir plus tard. |
+| Q17 | Le **numéro de contact de l'association** (US-E8) doit-il suivre la même règle que le téléphone des membres (+216 + 8 chiffres) ? | Oui, même règle (le texte de US-E8 n'est pas modifié à ce stade). |
 
 ---
 
@@ -937,6 +983,7 @@ Si le temps manque, ces éléments peuvent passer en « plus tard » sans casser
 - Suivi des remboursements, récapitulatif des encaissements par événement.
 - Purge automatique des comptes inactifs, statistiques de fréquentation.
 - Événements réservés aux adhérents.
+- Redemander l'accord quand la politique de confidentialité change (Q16).
 
 ### Ordre de réalisation conseillé
 

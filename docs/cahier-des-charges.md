@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Projet** | AAAS — application web de l'association |
-| **Version** | 1.0 — 10/11/2026 |
+| **Version** | 1.1 — 10/11/2026 |
 | **Porteur** | Khalil-B-L |
 | **Statut** | Validé pour démarrage — toute modification passe par l'historique en fin de document |
 
@@ -92,7 +92,7 @@ Le détail (user stories, critères d'acceptation Gherkin) est dans [`fonctionne
 | RG-08 | Prix optionnel en **dinars tunisiens (TND)**, jusqu'à 3 décimales (millimes) ; vide ou 0 = gratuit. L'admin ajoute la mention **payée** à une réservation Confirmée (ce n'est pas un statut, elle peut être retirée en cas d'erreur) ; aucun remboursement n'est géré par l'application. |
 | RG-09 | Il existe toujours au moins un administrateur. |
 | RG-10 | Le numéro de contact de l'association (avec option WhatsApp) est configurable par les admins, sans modifier le code. Il n'est affiché qu'aux membres connectés, jamais aux visiteurs. |
-| RG-11 | Le téléphone du membre est obligatoire à l'inscription (+216 suivi de 8 chiffres, ou numéro international), pour que l'admin puisse le joindre. |
+| RG-11 | Le téléphone du membre est obligatoire à l'inscription, pour que l'admin puisse le joindre. **Seuls les numéros tunisiens sont acceptés : « +216 » suivi de exactement 8 chiffres** (exemple : +216 20 123 456). La saisie locale sans préfixe, le préfixe « 00 » et les numéros internationaux sont refusés. |
 
 Les valeurs par défaut (48 h, 24 h) sont paramétrables et peuvent évoluer selon les réponses de l'association (questions ouvertes dans `fonctionnel/mvp.md`).
 
@@ -115,7 +115,8 @@ Les valeurs par défaut (48 h, 24 h) sont paramétrables et peuvent évoluer sel
 
 ### 6.4 Protection des données personnelles
 - Cadre légal : **loi organique tunisienne n° 2004-63 du 27 juillet 2004** (autorité de contrôle : INPDP), et non le RGPD.
-- Données collectées limitées au nécessaire (prénom, nom, e-mail, téléphone, mot de passe haché, date de l'accord) ; accord explicite à l'inscription.
+- Données collectées limitées au nécessaire : prénom, nom, e-mail, téléphone, mot de passe haché ; **date de création du compte** (affichée au membre, US-F3) ; **date de dernière connexion** (pour repérer les comptes inactifs depuis 3 ans, R25) ; **consentement : date d'acceptation et version de la politique de confidentialité acceptée**. Accord explicite à l'inscription.
+- **Mineurs** : aucun contrôle ni case à cocher dédiés ; le site est accessible à tout le monde.
 - Le membre peut **supprimer son compte** : réservations à venir annulées, historique passé anonymisé.
 - La nécessité d'une déclaration auprès de l'INPDP est à vérifier par l'association.
 
@@ -190,3 +191,4 @@ Une fonctionnalité est **terminée** quand :
 | Version | Date | Modification |
 |---|---|---|
 | 1.0 | 10/11/2026 | Création |
+| 1.1 | 10/11/2026 | Décisions du porteur : (1) données du compte complétées par la date de création et la date de dernière connexion (US-F3, R25) ; (2) téléphone du membre : uniquement « +216 » + 8 chiffres (RG-11) ; (3) mineurs : aucun contrôle dédié, site accessible à tous (§ 6.4) ; (4) consentement : conservation de la version de la politique de confidentialité acceptée, avec la date (§ 6.4). Table de correspondance du vocabulaire ajoutée dans `fonctionnel/mvp.md`. |

@@ -1,0 +1,22 @@
+# Exclus du contexte envoyé au démon Docker : build plus rapide, et aucun secret ni artefact local dans l'image.
+**/bin/
+**/obj/
+**/TestResults/
+**/node_modules/
+**/dist/
+**/.angular/
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+.claude/
+docs/
+tests/
+front/
+**/*.user
+**/appsettings.*.local.json
+.env
+*.env
+Dockerfile*
+docker-compose*.yml
