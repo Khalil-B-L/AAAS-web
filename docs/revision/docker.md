@@ -108,6 +108,35 @@ Points clés :
 - **Mot de passe SA figé dans le volume** : `MSSQL_SA_PASSWORD` n'est lu qu'à la **création** de la base `master`, au premier démarrage sur un volume vide. Le changer dans `.env` ensuite donne « Login failed for user 'sa' » (healthcheck rouge, `api` ne démarre pas). En local : `docker compose down -v` puis `up` (données perdues) ; sinon `ALTER LOGIN sa WITH PASSWORD = ...` avec l'ancien mot de passe.
 - **DataProtection** : l'avertissement « keys ... may not be persisted outside of the container » signifie que les clés sont perdues à la suppression du conteneur. Sans importance tant qu'on n'utilise ni cookies ni jetons de réinitialisation de mot de passe.
 
+## 6 bis. Étape 2 : cache de couches, migration sur un volume existant
+
+**Cache de couches après l'ajout d'un paquet NuGet.** L'étape 2 ajoute `Microsoft.EntityFrameworkCore` à `Aaas.Application.csproj` et à `Directory.Packages.props`. Ces deux fichiers sont copiés **avant** le `dotnet restore` : leur changement invalide la couche `COPY ... *.csproj`, donc le `restore`, puis tout ce qui suit.
+
+```
+# sortie abrégée, numéros d'étapes et durées indicatifs
+docker compose build api        # 1er build après l'ajout du paquet
+ => [build 3/9] COPY global.json nuget.config Directory.Build.props Directory.Packages.props ./   0.1s   ← refait
+ => [build 8/9] RUN dotnet restore src/Aaas.Api/Aaas.Api.csproj                                   25s    ← refait (téléchargement)
+docker compose build api        # 2e build, après une simple modification d'un .cs
+ => CACHED [build 3/9] COPY global.json ...
+ => CACHED [build 8/9] RUN dotnet restore ...                                                            ← réutilisé
+ => [build 9/9] COPY src/ src/                                                                          ← seul le code est refait
+```
+
+Règle : **ce qui change rarement en haut, ce qui change souvent en bas**. Une couche invalidée invalide toutes les suivantes. C'est pour cela que `.editorconfig` (ajouté à l'étape 2) est copié **après** le `restore` : le modifier ne force pas un nouveau téléchargement des paquets.
+
+À observer soi-même : `docker compose build api` deux fois de suite (tout `CACHED`), puis modifier un `.cs` et relancer (seules les dernières étapes sont refaites). `docker history aaas-api:local` liste les couches et leur taille.
+
+**Migration au démarrage sur un volume existant.** La base vit dans le volume `sqlserver-data` (§ 1). `docker compose up -d --build api` remplace le **conteneur** de l'API (nouvelle image) sans toucher au volume de SQL Server : au démarrage, l'API voit dans `__EFMigrationsHistory` que `InitialIdentity` est déjà appliquée et n'applique que `AddEventsAndAssociationSettings`. Les comptes de l'étape 1 restent.
+
+| Commande | Conteneurs | Volume `sqlserver-data` (base, comptes, admin) |
+|---|---|---|
+| `docker compose up -d --build api` | API recréée | conservé, migration ajoutée |
+| `docker compose down` | supprimés | **conservé** |
+| `docker compose down -v` | supprimés | **supprimé** : au prochain `up`, base vide, toutes les migrations et le premier admin sont rejoués. Local uniquement. |
+
+Vérifier la migration depuis le conteneur SQL : voir `docs/technique/exploitation.md` § 7 (`sqlcmd -I`, `MSYS_NO_PATHCONV=1` sous Git Bash).
+
 ## 7. Flux complet d'une requête (vue d'ensemble du projet)
 
 Exemple : un membre clique sur « Se connecter ».
@@ -144,4 +173,6 @@ Plus tard : en **CI** (GitHub Actions), la même image est construite et publié
 - **`depends_on` garantit-il que la base est prête ?** Non, seulement qu'elle est lancée ; il faut `condition: service_healthy` avec un healthcheck, et idéalement un retry côté appli (`EnableRetryOnFailure`).
 - **Pourquoi ne pas lancer en root ?** Principe du moindre privilège : limiter l'impact d'une faille.
 - **Pourquoi éviter `latest` ?** Le contenu change sans que le fichier change : deux postes ou deux builds n'ont pas la même version, et un bug peut apparaître « tout seul ». On épingle un tag précis (ou un digest) et on monte de version volontairement.
+- **J'ajoute un paquet NuGet : pourquoi le build Docker est-il long une fois, puis rapide ?** Le `.csproj` modifié invalide la couche du `restore` (téléchargement) ; ensuite elle est en cache tant que les fichiers de dépendances ne changent pas.
+- **`docker compose down` efface-t-il ma base ?** Non, seulement les conteneurs et le réseau ; `down -v` supprime aussi les volumes.
 - **`"1433:1433"` ou `"127.0.0.1:1433:1433"` ?** Le premier expose le port à tout le réseau ; le second le limite à la machine. En développement, on n'expose que ce dont l'hôte a besoin.

@@ -4,7 +4,7 @@ namespace Aaas.Api.Errors;
 
 /// <summary>
 /// Complète toutes les ProblemDetails, y compris celles produites par le framework
-/// (400 de validation automatique, 401/403/404 sans corps) : code stable + titre français.
+/// (400 de validation automatique, 401/403/404/405/415 sans corps) : code stable + titre français.
 /// </summary>
 internal static class ProblemDetailsSetup
 {
@@ -16,6 +16,8 @@ internal static class ProblemDetailsSetup
         [StatusCodes.Status401Unauthorized] = (ErrorCodes.Unauthorized, "Vous devez être connecté. Votre session a peut-être expiré."),
         [StatusCodes.Status403Forbidden] = (ErrorCodes.Forbidden, "Vous n'avez pas les droits nécessaires pour cette action."),
         [StatusCodes.Status404NotFound] = (ErrorCodes.NotFound, "Contenu introuvable."),
+        [StatusCodes.Status405MethodNotAllowed] = (ErrorCodes.MethodNotAllowed, "Cette action n'est pas possible sur cette adresse."),
+        [StatusCodes.Status415UnsupportedMediaType] = (ErrorCodes.UnsupportedMediaType, "Le corps de la requête doit être envoyé en JSON (en-tête Content-Type: application/json)."),
         [StatusCodes.Status500InternalServerError] = (ErrorCodes.InternalError, "Une erreur inattendue est survenue. Veuillez réessayer plus tard."),
     };
 

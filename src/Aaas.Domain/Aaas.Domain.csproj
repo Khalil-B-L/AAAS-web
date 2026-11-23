@@ -1,3 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Le Domain n'a aucune dépendance NuGet : règles métier pures, testables sans base. -->
+  <ItemGroup>
+    <!-- AssociationSettings n'a pas de constructeur public (sa ligne vient de la migration) : les tests passent par une fabrique interne. -->
+    <InternalsVisibleTo Include="Aaas.Domain.Tests" />
+  </ItemGroup>
 </Project>

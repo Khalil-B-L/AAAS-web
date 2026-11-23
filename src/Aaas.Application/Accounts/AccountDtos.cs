@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Aaas.Application.Accounts.Validation;
+using Aaas.Application.Common.Validation;
 
 namespace Aaas.Application.Accounts;
 

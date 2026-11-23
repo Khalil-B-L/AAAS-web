@@ -1,3 +1,6 @@
+using Aaas.Application.Abstractions;
+using Aaas.Domain.Events;
+using Aaas.Domain.Settings;
 using Aaas.Infrastructure.Identity;
 using Aaas.Infrastructure.Persistence.Conventions;
 using Microsoft.AspNetCore.Identity;
@@ -7,8 +10,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Aaas.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
+    : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options), IAppDbContext
 {
+    public DbSet<Event> Events => Set<Event>();
+
+    public DbSet<AssociationSettings> AssociationSettings => Set<AssociationSettings>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         // D'abord le modèle Identity, puis nos configurations qui le complètent ou le remplacent.

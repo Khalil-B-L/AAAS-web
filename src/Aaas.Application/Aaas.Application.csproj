@@ -3,6 +3,9 @@
     <ProjectReference Include="..\Aaas.Domain\Aaas.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- EF Core « nu » (DbSet, LINQ, DbUpdateConcurrencyException), sans SqlServer ni Relational (ADR 0001, point 3) :
+         transactions et SQL propre à SQL Server restent dans Infrastructure, derrière IEventLock. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>

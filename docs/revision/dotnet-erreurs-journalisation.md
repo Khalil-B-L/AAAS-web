@@ -63,8 +63,27 @@ Le message SQL est localisé et porteur de données : ne jamais faire `ex.Messag
 - `Information` / `Debug` : déroulement normal / détail technique.
 - `logger.IsEnabled(level)` avant un log dont les arguments coûtent (analyseur CA1873).
 
-## 6. Questions d'entretien
+## 6. Le dernier log avant de planter peut être perdu
+
+- **Le fait** : `ILogger.Log` vers la console **n'écrit pas** directement. `ConsoleLoggerProvider` met le message dans une file ; un thread d'arrière-plan la vide vers stdout. Même principe pour Application Insights (envoi par lots, toutes les quelques secondes) et la plupart des sinks réseau.
+- **Le piège** : une exception qui sort de `Main` (« Unhandled exception ») termine le processus **sans** attendre ce thread. Le log `Critical` écrit juste avant le `throw` est souvent perdu, précisément celui qui expliquait la panne.
+- **La parade** : libérer l'hôte avant de quitter. `await app.DisposeAsync()` dispose le conteneur DI, donc la `LoggerFactory` et ses fournisseurs, qui vident leur file (`ConsoleLoggerProcessor` attend au plus 1,5 s ; Application Insights fait un `Flush`).
+
+```csharp
+// Program.cs (AAAS), dans le catch de l'initialisation
+startupLogger.LogCritical(safeMessage + " Type : {ExceptionType}, erreur SQL : {SqlErrorNumber}.", type, sqlNumber);
+await FlushLogsAsync(app); // app.DisposeAsync() ; un échec de Dispose ne doit pas masquer l'exception d'origine
+throw new InvalidOperationException($"{safeMessage} ({type}, erreur SQL : {sqlNumber?.ToString() ?? "aucune"})");
+```
+
+- **Ceinture et bretelles** : l'exception relancée, elle, est écrite **de façon synchrone** par le runtime sur stderr. On y répète donc l'indice utile (type + numéro SQL, jamais le message SQL) : même si le log est perdu, `docker compose logs` montre `erreur SQL : 208`.
+- **`throw;` après un `await` dans un `catch`** : autorisé (C# 6+) ; le compilateur passe par `ExceptionDispatchInfo`, la pile d'origine est conservée.
+- **Hors ASP.NET** (console, worker) : même règle, `using var host = ...` ou `loggerFactory.Dispose()` dans un `finally`. Avec Serilog : `Log.CloseAndFlush()`.
+- **Vérifier** : base sans schéma, `Database__MigrateOnStartup=false`, `dotnet run` → la ligne `crit: Aaas.Startup` doit apparaître **avant** `Unhandled exception`.
+
+## 7. Questions d'entretien
 
 - **Pourquoi ne pas journaliser `ex.ToString()` partout ?** Le message et les `InnerException` peuvent contenir des données personnelles (RGPD) ou des secrets ; on journalise des identifiants et des codes.
 - **Que se passe-t-il si `IExceptionHandler.TryHandleAsync` renvoie `false` ?** Le handler suivant est essayé, puis le comportement par défaut du middleware, qui journalise l'exception (et la relance si personne ne répond).
+- **Pourquoi mon dernier log n'apparaît-il pas quand l'application plante au démarrage ?** Le logger console est asynchrone (file + thread d'arrière-plan) ; le processus meurt avant que la file soit vidée. Il faut disposer l'hôte (ou la `LoggerFactory`) avant de laisser l'exception sortir de `Main`.
 - **Comment gérer « créer si absent » avec plusieurs instances ?** Contrainte d'unicité en base + interception de la violation + revérification (ou `MERGE`/verrou applicatif). Le `if (!exists)` seul ne suffit pas.

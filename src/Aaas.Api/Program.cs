@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 using Aaas.Api.Auth;
 using Aaas.Api.Errors;
@@ -20,8 +21,14 @@ builder.Services
 
 builder.Services
     .AddControllers(options =>
+    {
         // Les clés d'erreur de validation reprennent les noms JSON (« phoneNumber ») au lieu des noms C# (« PhoneNumber »).
-        options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider()))
+        options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
+        // Même convention pour les paramètres de requête des listes (?pageSize= → errors.pageSize).
+        options.ModelMetadataDetailsProviders.Add(new CamelCaseQueryNamesProvider());
+        // « ?page=abc » : message français au lieu de « The value 'abc' is not valid ».
+        FrenchModelBindingMessages.Apply(options.ModelBindingMessageProvider);
+    })
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -74,6 +81,7 @@ catch (Exception ex) when (ex is not OperationCanceledException)
     if (ex.GetType() == typeof(InvalidOperationException) && ex.InnerException is null)
     {
         startupLogger.LogCritical(ex, "Échec de l'initialisation de la base : l'API s'arrête.");
+        await FlushLogsAsync(app);
         throw;
     }
 
@@ -81,19 +89,39 @@ catch (Exception ex) when (ex is not OperationCanceledException)
         "Échec de l'initialisation de la base : l'API s'arrête. Détail non journalisé (peut contenir des données " +
         "personnelles) : vérifier la base, les migrations et la configuration Bootstrap.";
     var exceptionType = ex.GetType().FullName;
+    int? sqlErrorNumber = SqlServerErrors.TryGetSqlErrorNumber(ex, out var number) ? number : null;
     if (startupLogger.IsEnabled(LogLevel.Critical))
     {
-        int? sqlErrorNumber = SqlServerErrors.TryGetSqlErrorNumber(ex, out var number) ? number : null;
         startupLogger.LogCritical(
             safeMessage + " Type : {ExceptionType}, erreur SQL : {SqlErrorNumber}.", exceptionType, sqlErrorNumber);
     }
 
+    await FlushLogsAsync(app);
+
     // Pas de « throw; » ici : le runtime écrirait l'exception d'origine (message SQL compris) sur stderr,
-    // donc dans « docker compose logs ». On relance une exception neutre, sans InnerException.
-    throw new InvalidOperationException($"{safeMessage} ({exceptionType})");
+    // donc dans « docker compose logs ». On relance une exception neutre, sans InnerException. Le type et le
+    // numéro SQL y sont répétés : ils restent visibles sur stderr même si le log Critical n'a pas pu partir.
+    throw new InvalidOperationException(
+        $"{safeMessage} ({exceptionType}, erreur SQL : {sqlErrorNumber?.ToString(CultureInfo.InvariantCulture) ?? "aucune"})");
 }
 
 await app.RunAsync();
+
+// Le logger console (et Application Insights) écrit via une file vidée par un thread d'arrière-plan : une exception
+// qui sort de Main termine le processus sans attendre ce thread. Libérer l'hôte dispose les fournisseurs de logs,
+// qui vident leur file. Un échec de libération ne doit pas masquer l'exception d'origine, relancée juste après.
+static async Task FlushLogsAsync(WebApplication app)
+{
+    try
+    {
+        await app.DisposeAsync();
+    }
+#pragma warning disable CA1031 // volontaire : seule l'exception d'initialisation doit remonter
+    catch (Exception)
+#pragma warning restore CA1031
+    {
+    }
+}
 
 // Rendue publique pour WebApplicationFactory<Program> (tests d'intégration).
 public partial class Program;

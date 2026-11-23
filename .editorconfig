@@ -1,0 +1,7 @@
+# Pas de « root = true » : seules les sections ci-dessous sont ajoutées, le reste garde le comportement par défaut.
+
+# Migrations EF Core : code généré par « dotnet ef migrations add », jamais retouché à la main.
+# Le déclarer comme tel évite les avertissements d'analyse (ex. CA1861 sur « columns: new[] { ... } »)
+# qui casseraient la règle « 0 avertissement » à chaque nouvelle migration.
+[src/Aaas.Infrastructure/Persistence/Migrations/*.cs]
+generated_code = true

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,8 +22,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         ["Database:MigrateOnStartup"] = "true",
     };
 
-    public ApiFactory(string connectionString, Dictionary<string, string?>? overrides = null)
+    private readonly TimeProvider? _clock;
+
+    public ApiFactory(string connectionString, Dictionary<string, string?>? overrides = null, TimeProvider? clock = null)
     {
+        _clock = clock;
         ConnectionString = connectionString;
         _settings["ConnectionStrings:Default"] = connectionString;
         if (overrides is not null)
@@ -50,6 +55,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(_settings));
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
+        if (_clock is not null)
+        {
+            // Remplace l'horloge de l'application (enregistrée par Infrastructure) par l'horloge simulée du test.
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(_clock);
+            });
+        }
     }
 
     /// <summary>Exécute une requête SQL directement en base (préparation ou vérification).</summary>

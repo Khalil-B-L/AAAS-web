@@ -16,6 +16,15 @@ public class PhoneNumberTests
         Assert.Equal("+216 20 123 456", phone.ToDisplayString());
     }
 
+    [Theory(DisplayName = "RG-11 : un numéro fixe tunisien (8 chiffres, ex. 71 = Grand Tunis) est accepté comme un mobile")]
+    [InlineData("+216 71 123 456", "+21671123456")]
+    [InlineData("+21673123456", "+21673123456")]
+    public void Tunisian_landline_number_is_accepted(string input, string expected)
+    {
+        Assert.True(PhoneNumber.TryParse(input, out var phone));
+        Assert.Equal(expected, phone!.Value);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

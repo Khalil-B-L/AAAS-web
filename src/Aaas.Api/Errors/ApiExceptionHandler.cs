@@ -68,12 +68,13 @@ internal sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsS
 
     private void LogUnhandled(HttpContext httpContext, Exception exception)
     {
-        if (SqlServerErrors.TryGetUniqueKeyViolationNumber(exception, out var sqlErrorNumber))
+        if (SqlServerErrors.TryGetValueRevealingErrorNumber(exception, out var sqlErrorNumber))
         {
-            // R24 : le message SQL d'une violation d'unicité contient la valeur dupliquée (souvent un e-mail).
-            // On journalise sans l'exception : type, numéro SQL et requête suffisent à localiser le code fautif.
+            // R24 : le message SQL d'une violation d'unicité (2601/2627) contient la valeur dupliquée (souvent un
+            // e-mail), celui d'une troncature (2628) la valeur tronquée. On journalise sans l'exception : type,
+            // numéro SQL et requête suffisent à localiser le code fautif.
             logger.LogError(
-                "Violation d'unicité SQL {SqlErrorNumber} non interceptée ({ExceptionType}) sur {Method} {Path}",
+                "Erreur SQL {SqlErrorNumber} non interceptée, journalisée sans son message ({ExceptionType}) sur {Method} {Path}",
                 sqlErrorNumber, exception.GetType().Name, httpContext.Request.Method, httpContext.Request.Path);
             return;
         }

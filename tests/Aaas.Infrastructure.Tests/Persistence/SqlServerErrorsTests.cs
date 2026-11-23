@@ -42,6 +42,20 @@ public sealed class SqlServerErrorsTests
         Assert.Equal(18456, number);
     }
 
+    [Theory(DisplayName = "Erreur porteuse d'une valeur saisie : 2601, 2627, 2628 oui ; 18456, 547 non")]
+    [InlineData(2601, true)]
+    [InlineData(2627, true)]
+    [InlineData(2628, true)]
+    [InlineData(18456, false)]
+    [InlineData(547, false)]
+    public void ValueRevealingError_Recognized(int number, bool expected)
+    {
+        var ex = new DbUpdateException("save", SqlExceptionFactory.Create(number));
+
+        Assert.Equal(expected, SqlServerErrors.TryGetValueRevealingErrorNumber(ex, out _));
+        Assert.False(number == 2628 && SqlServerErrors.IsUniqueKeyViolation(ex)); // la troncature n'est pas un doublon
+    }
+
     [Fact(DisplayName = "null et exception sans SqlException : faux, numéro 0")]
     public void NullOrNonSql_ReturnsFalse()
     {

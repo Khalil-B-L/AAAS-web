@@ -24,10 +24,13 @@ public abstract class ApiTestBase(SqlServerFixture sql) : IAsyncLifetime
 
     protected virtual Dictionary<string, string?>? ConfigurationOverrides => null;
 
+    /// <summary>Horloge simulée à injecter dans l'API (null = horloge réelle).</summary>
+    protected virtual TimeProvider? ClockOverride => null;
+
     public async ValueTask InitializeAsync()
     {
         var connectionString = await Sql.CreateDatabaseAsync();
-        Factory = new ApiFactory(connectionString, ConfigurationOverrides);
+        Factory = new ApiFactory(connectionString, ConfigurationOverrides, ClockOverride);
         Client = Factory.CreateClient();
     }
 

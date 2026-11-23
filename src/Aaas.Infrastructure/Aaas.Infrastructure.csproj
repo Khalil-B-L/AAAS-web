@@ -10,4 +10,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- EventLock est interne : le test vérifie le SQL de verrouillage sans l'exposer publiquement. -->
+    <InternalsVisibleTo Include="Aaas.Infrastructure.Tests" />
+  </ItemGroup>
 </Project>

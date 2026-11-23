@@ -72,11 +72,14 @@ public sealed class ApiExceptionHandlerTests
     }
 
     private static DbUpdateException UniqueViolation(int number) =>
-        new("An error occurred while saving", SqlExceptionFactory.Create(number, $"Cannot insert duplicate key. The duplicate key value is ({Secret})."));
+        new("An error occurred while saving", SqlExceptionFactory.Create(number, number == 2628
+            ? $"String or binary data would be truncated in table 'Aaas.dbo.AspNetUsers', column 'Email'. Truncated value: '{Secret}'."
+            : $"Cannot insert duplicate key. The duplicate key value is ({Secret})."));
 
-    [Theory(DisplayName = "Violation d'unicité non interceptée -> 500, log Error sans exception, avec SqlErrorNumber, sans message SQL")]
+    [Theory(DisplayName = "Erreur SQL porteuse d'une valeur saisie (unicité 2601/2627, troncature 2628) -> 500, log Error sans exception ni message SQL")]
     [InlineData(2601)]
     [InlineData(2627)]
+    [InlineData(2628)]
     public async Task UniqueViolation_IsLoggedWithoutException(int number)
     {
         var harness = Harness.Create("application/json");

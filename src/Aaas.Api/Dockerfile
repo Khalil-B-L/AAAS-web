@@ -15,6 +15,8 @@ COPY src/Aaas.Api/Aaas.Api.csproj src/Aaas.Api/
 RUN dotnet restore src/Aaas.Api/Aaas.Api.csproj
 
 # Puis le code : seule cette partie est refaite quand on modifie un .cs.
+# .editorconfig (migrations = code généré, sans avertissement d'analyse) : copié après le restore, qui n'en dépend pas.
+COPY .editorconfig ./
 COPY src/ src/
 RUN dotnet publish src/Aaas.Api/Aaas.Api.csproj -c Release -o /app/publish --no-restore /p:UseAppHost=false
 

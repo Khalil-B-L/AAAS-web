@@ -15,6 +15,13 @@ public static class SqlServerErrors
     public static bool TryGetUniqueKeyViolationNumber(Exception? exception, out int sqlErrorNumber) =>
         TryGetSqlErrorNumber(exception, out sqlErrorNumber) && sqlErrorNumber is 2601 or 2627;
 
+    /// <summary>
+    /// Erreurs dont le message recopie une valeur saisie (R24) : 2601/2627 (valeur dupliquée) et
+    /// 2628 (chaîne tronquée : « Truncated value: '...' »). À journaliser par leur numéro, jamais avec l'exception.
+    /// </summary>
+    public static bool TryGetValueRevealingErrorNumber(Exception? exception, out int sqlErrorNumber) =>
+        TryGetSqlErrorNumber(exception, out sqlErrorNumber) && sqlErrorNumber is 2601 or 2627 or 2628;
+
     /// <summary>Numéro de la première SqlException de la chaîne : journalisable sans risque, contrairement au message.</summary>
     public static bool TryGetSqlErrorNumber(Exception? exception, out int sqlErrorNumber)
     {

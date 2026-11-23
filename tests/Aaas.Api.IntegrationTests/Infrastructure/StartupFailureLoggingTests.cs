@@ -1,5 +1,9 @@
 using Aaas.Api.IntegrationTests.Support;
+using Aaas.Infrastructure.Initialization;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Aaas.Api.IntegrationTests.Infrastructure;
 
@@ -43,6 +47,9 @@ public sealed class StartupFailureLoggingTests(SqlServerFixture sql)
             var rethrown = Assert.Single(chain, e => e.Message.StartsWith("Échec de l'initialisation de la base", StringComparison.Ordinal));
             Assert.IsType<InvalidOperationException>(rethrown);
             Assert.Null(rethrown.InnerException);
+            // Type et numéro SQL répétés dans le message relancé : l'indice survit même si les logs sont perdus.
+            Assert.Contains("erreur SQL : 208", rethrown.Message);
+            Assert.Contains("Microsoft.Data.SqlClient.SqlException", rethrown.Message);
             Assert.DoesNotContain(chain, e => e is SqlException);
             Assert.DoesNotContain(chain, e => e.Message.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase)
                 || e.Message.Contains("Nom d'objet non valide", StringComparison.OrdinalIgnoreCase));
@@ -75,6 +82,10 @@ public sealed class StartupFailureLoggingTests(SqlServerFixture sql)
 
             Assert.ThrowsAny<Exception>(() => factory.CreateClient());
 
+            // Précondition : l'échec vient bien de l'accès à la base (base vide, MigrateOnStartup=false, première requête
+            // sur AspNetRoles -> SQL 208). Sans elle, un démarrage qui échoue plus tôt (configuration) laisserait ce test vert à tort.
+            Assert.Contains(factory.Logs.Messages, m => m.StartsWith("[Critical]", StringComparison.Ordinal) && m.Contains("erreur SQL : 208", StringComparison.Ordinal));
+
             var leaks = factory.Logs.Messages
                 .Where(m => m.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase))
                 .Select(m => m[..Math.Min(200, m.Length)])
@@ -101,6 +112,10 @@ public sealed class StartupFailureLoggingTests(SqlServerFixture sql)
             await using var factory = new ApiFactory(cs, new Dictionary<string, string?> { ["Database:MigrateOnStartup"] = "false" });
 
             Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+            // Précondition : l'échec vient bien de l'accès à la base (base vide, MigrateOnStartup=false, première requête
+            // sur AspNetRoles -> SQL 208), donc EF a bien traité une lecture en échec. Sans elle, ce test passerait à tort.
+            Assert.Contains(factory.Logs.Messages, m => m.StartsWith("[Critical]", StringComparison.Ordinal) && m.Contains("erreur SQL : 208", StringComparison.Ordinal));
 
             var offending = factory.Logs.Messages
                 .Where(m => m.Contains("Microsoft.EntityFrameworkCore", StringComparison.Ordinal)
@@ -142,6 +157,44 @@ public sealed class StartupFailureLoggingTests(SqlServerFixture sql)
             Assert.Contains("Bootstrap:AdminPhone invalide", critical); // message de l'exception jointe conservé
             Assert.DoesNotContain("Détail non journalisé", critical);
             Assert.DoesNotContain(overrides["Bootstrap:AdminEmail"]!, string.Join("\n", factory.Logs.Messages), StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await sql.DropDatabaseAsync(cs);
+        }
+    }
+
+    [Fact(DisplayName = "Démarrage : exception ni SQL ni nue (InnerException non SQL) -> message relancé 'erreur SQL : aucune', Critical sans message brut")]
+    public async Task Non_sql_exception_with_inner_exception_is_neutralised_without_leaking_its_message()
+    {
+        const string secret = "secret.personne@example.org";
+        var cs = await sql.CreateDatabaseAsync();
+        try
+        {
+            await using var baseFactory = new ApiFactory(cs);
+            // Cas rendu atteignable en injectant un DatabaseInitializer qui échoue (la voie « nue » exige InnerException nulle).
+            await using var factory = baseFactory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<DatabaseInitializer>();
+                services.AddScoped<DatabaseInitializer>(_ => throw new InvalidOperationException(
+                    "Doublon " + secret, new IOException("détail interne " + secret)));
+            }));
+
+            var ex = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+            var chain = Chain(ex).ToList();
+            var rethrown = Assert.Single(chain, e => e.Message.StartsWith("Échec de l'initialisation de la base", StringComparison.Ordinal));
+            Assert.Null(rethrown.InnerException);
+            Assert.Contains("erreur SQL : aucune", rethrown.Message);
+            Assert.Contains("System.InvalidOperationException", rethrown.Message);
+            Assert.DoesNotContain(chain, e => e.Message.Contains(secret, StringComparison.OrdinalIgnoreCase));
+
+            // Le fournisseur de logs de baseFactory est réutilisé par la fabrique dérivée.
+            var critical = Assert.Single(baseFactory.Logs.Messages, m => m.StartsWith("[Critical]", StringComparison.Ordinal));
+            Assert.Contains("Détail non journalisé", critical);
+            Assert.Contains("erreur SQL : ", critical);
+            Assert.DoesNotContain(secret, critical, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("   at ", critical);
         }
         finally
         {

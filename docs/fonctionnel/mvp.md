@@ -1,7 +1,7 @@
 # Cadrage fonctionnel du MVP — AAAS
 
 > Rédigé par l'expert fonctionnel. Document de référence pour l'agent `architecte` (choix techniques) et l'agent `testeur` (les scénarios Gherkin servent de base aux tests).
-> Statut : **proposition, version 3**, mise à jour avec les décisions du porteur de projet. Les valeurs par défaut marquées *(défaut)* sont à confirmer avec l'association (voir § 5).
+> Statut : **proposition, version 4**, mise à jour avec les décisions du porteur de projet (cahier des charges v1.2). Les valeurs par défaut marquées *(défaut)* sont à confirmer avec l'association (voir § 5).
 
 ### Décisions du porteur de projet (version 2)
 - L'association est en **Tunisie**. L'application est **en français uniquement**.
@@ -17,6 +17,15 @@
 - **Mineurs** : aucune case à cocher ni contrôle dédié ; le site est accessible à tout le monde. La mention « inscription réservée aux majeurs » est abandonnée.
 - **Consentement** : on conserve la **version de la politique de confidentialité acceptée**, avec la date d'acceptation.
 
+### Décisions du porteur de projet (version 4, cahier des charges v1.2 — questions de l'étape 2)
+- **Événement déjà commencé** : un admin **peut** le modifier (pas un événement terminé ou annulé). Voir R28, US-E2.
+- **Événement terminé** : son **détail reste accessible** par son adresse (historique conservé) ; il disparaît de la liste. Voir R19, US-C2.
+- **Limites de saisie** validées : capacité de 1 à 10 000, prix jusqu'à 99 999,999 TND, titre et lieu 200 caractères, description 4 000 caractères. Voir R11, R12, R29, US-E2.
+- **Numéro fixe** : un numéro fixe tunisien est accepté (« +216 » + 8 chiffres, mobile ou fixe), y compris comme numéro de contact de l'association. Voir R20, Q17.
+- **Numéro de contact** : un admin **peut le retirer**. Voir R8, US-E8.
+- **Brouillon** : un admin **peut le supprimer** dès l'étape 2, **uniquement s'il n'a jamais été publié**. Voir R15, US-E2.
+- Les autres questions de l'étape 2 gardent la **valeur par défaut** proposée par l'architecte (événement en cours listé, format du prix, changement de lieu sans avertissement, avertissement « numéro non configuré » non bloquant, 20 événements par page). Voir Q18 à Q27.
+
 ### Correspondance du vocabulaire (cahier des charges / ce document)
 
 | Cahier des charges | Ce document | Dans le code (indication de l'architecte) |
@@ -26,7 +35,7 @@
 | Administrateur | Administrateur | rôle `Admin` |
 | RG-xx (règles obligatoires, § 5.2 du cahier) | R-xx (règles détaillées, § 4 ci-dessous) | — |
 
-Correspondance des règles : RG-01 = R2, RG-02 = R5 et R7, RG-03 = R4, RG-04 = R6, RG-05 = R9, RG-06 = R11, RG-07 = R14 et R15, RG-08 = R12 et R13, RG-09 = R22, RG-10 = R8, RG-11 = R20. En cas de contradiction, le cahier des charges fait foi.
+Correspondance des règles : RG-01 = R2, RG-02 = R5 et R7, RG-03 = R4, RG-04 = R6, RG-05 = R9, RG-06 = R11, RG-07 = R14 et R15, RG-08 = R12 et R13, RG-09 = R22, RG-10 = R8, RG-11 = R20, RG-12 = R28, RG-13 = R11, R12 et R29, RG-14 = R19. En cas de contradiction, le cahier des charges fait foi.
 
 ---
 
@@ -40,7 +49,7 @@ Permettre à l'association de **publier ses actualités et ses événements**, e
 |---|---|---|
 | **Visiteur** | Toute personne non connectée | Lire les actualités publiées, voir les événements à venir (prix, places restantes), créer un compte, se connecter. |
 | **Utilisateur** | Personne ayant un compte et connectée | Tout ce que fait le visiteur + demander une place, voir le numéro de l'administrateur à contacter, suivre ses réservations, annuler, supprimer son compte. |
-| **Administrateur** | Bénévole désigné par l'association | Gérer les actualités et les événements ; confirmer ou refuser les demandes ; marquer une réservation comme payée ; voir les inscrits ; annuler une réservation ou un événement ; configurer le numéro de contact. |
+| **Administrateur** | Bénévole désigné par l'association | Gérer les actualités et les événements ; confirmer ou refuser les demandes ; marquer une réservation comme payée ; voir les inscrits ; annuler une réservation ou un événement ; configurer (ou retirer) le numéro de contact. |
 | **Application** (traitement automatique) | — | Faire passer en « Expirée » les demandes non traitées dans le délai. |
 
 L'**assistant RAG** (questions sur les documents de l'association) est prévu **plus tard** (semaine 4) et n'est pas cadré ici.
@@ -108,8 +117,8 @@ Fonctionnalité: Création de compte
     Alors le compte n'est pas créé
     Et un message m'indique qu'un compte existe déjà avec cet e-mail
 
-  Scénario: Numéro tunisien valide
-    Quand je crée un compte avec le téléphone "+216 20 123 456" ou "+21620123456"
+  Scénario: Numéro tunisien valide (mobile ou fixe)
+    Quand je crée un compte avec le téléphone "+216 20 123 456", "+21620123456" ou "+216 71 123 456" (numéro fixe)
     Alors le compte est créé
 
   Scénario: Numéro de téléphone invalide
@@ -234,7 +243,7 @@ Fonctionnalité: Détail d'une actualité
 
 ### Épique C — Événements
 
-#### US-C1 — Consulter les événements à venir *(modifiée : prix, places restantes)*
+#### US-C1 — Consulter les événements à venir *(modifiée : prix, places restantes ; v4 : événement en cours, 20 par page, format du prix)*
 > En tant que **visiteur**, je veux **voir la liste des événements à venir** afin de **choisir ceux qui m'intéressent**.
 
 ```gherkin
@@ -245,6 +254,18 @@ Fonctionnalité: Liste des événements
     Quand j'ouvre la page des événements
     Alors je vois uniquement les événements publiés à venir, du plus proche au plus lointain
     Et chacun affiche son titre, sa date, son heure, son lieu, son prix et le nombre de places restantes
+
+  Scénario: Événement en cours
+    Étant donné un événement publié qui a commencé il y a 1 heure et qui se termine dans 2 heures
+    Quand j'ouvre la page des événements
+    Alors l'événement est encore dans la liste
+    Et il est affiché avec la mention "Réservations closes"
+    Et il n'est pas réservable
+
+  Scénario: Événement terminé
+    Étant donné un événement publié dont l'heure de fin est dépassée
+    Quand j'ouvre la page des événements
+    Alors l'événement n'est plus dans la liste
 
   Scénario: Places restantes comptant les demandes en attente
     Étant donné un événement de 20 places avec 8 réservations confirmées, 4 en attente et 3 refusées ou expirées
@@ -257,6 +278,12 @@ Fonctionnalité: Liste des événements
     Alors le premier affiche "Gratuit"
     Et le second affiche "15 TND, à régler sur place"
 
+  Scénario: Format du prix
+    Étant donné un événement à 15 TND et un événement à 12,5 TND
+    Quand j'ouvre la page des événements
+    Alors le premier affiche "15 TND, à régler sur place" (sans décimales)
+    Et le second affiche "12,500 TND, à régler sur place" (3 décimales)
+
   Scénario: Événement complet
     Étant donné un événement de 20 places avec 15 réservations confirmées et 5 en attente
     Quand j'ouvre la page des événements
@@ -268,12 +295,18 @@ Fonctionnalité: Liste des événements
     Alors l'événement est affiché avec la mention "Annulé"
     Et il n'est pas réservable
 
+  Scénario: Plus de 20 événements
+    Étant donné que 45 événements publiés sont à venir
+    Quand j'ouvre la page des événements
+    Alors je vois les 20 premiers, du plus proche au plus lointain
+    Et je peux passer à la page suivante
+
   Scénario: Aucun événement à venir
     Quand aucun événement publié n'est à venir
     Alors un message indique "Aucun événement prévu pour le moment"
 ```
 
-#### US-C2 — Voir le détail d'un événement *(modifiée : prix, statut de ma demande)*
+#### US-C2 — Voir le détail d'un événement *(modifiée : prix, statut de ma demande ; v4 : événement terminé)*
 > En tant que **visiteur**, je veux **voir le détail d'un événement** afin de **savoir s'il me convient avant de demander une place**.
 
 ```gherkin
@@ -296,6 +329,13 @@ Fonctionnalité: Détail d'un événement
     Quand j'ouvre l'événement
     Alors je vois "Réservation confirmée"
     Et je peux annuler si le délai d'annulation n'est pas dépassé
+
+  Scénario: Événement terminé (historique conservé)
+    Étant donné un événement publié dont l'heure de fin est dépassée
+    Quand j'ouvre son adresse directement (par exemple depuis "Mes réservations")
+    Alors je vois son détail
+    Et il est indiqué que l'événement est terminé
+    Et aucune demande de place n'est possible
 
   Scénario: Événement non publié ou inexistant
     Quand j'ouvre l'adresse d'un événement en brouillon ou inexistant
@@ -462,6 +502,12 @@ Fonctionnalité: Contact de l'administrateur
     Étant donné que je suis visiteur non connecté
     Quand je consulte un événement
     Alors le numéro de l'administrateur ne m'est pas affiché
+
+  Scénario: Numéro retiré par l'administrateur
+    Étant donné qu'aucun numéro de contact n'est configuré (jamais enregistré ou retiré)
+    Quand je consulte ma demande en attente
+    Alors aucun numéro ni lien d'appel n'est affiché
+    Et un message m'indique que l'association n'a pas communiqué de numéro pour le moment
 ```
 
 #### US-D5 — Expiration automatique des demandes *(nouvelle)*
@@ -549,8 +595,8 @@ Fonctionnalité: Gestion des actualités
     Alors elle n'est pas enregistrée et le champ manquant est signalé
 ```
 
-#### US-E2 — Gérer les événements *(modifiée : prix, capacité)*
-> En tant qu'**administrateur**, je veux **créer, modifier, publier et dépublier un événement** afin de **proposer des activités aux membres**.
+#### US-E2 — Gérer les événements *(modifiée : prix, capacité ; v4 : événement commencé, limites de saisie, lieu, suppression d'un brouillon)*
+> En tant qu'**administrateur**, je veux **créer, modifier, publier, dépublier et supprimer un brouillon d'événement** afin de **proposer des activités aux membres**.
 
 ```gherkin
 Fonctionnalité: Gestion des événements
@@ -578,6 +624,25 @@ Fonctionnalité: Gestion des événements
     Quand j'enregistre un événement avec une capacité de 0, un prix négatif, une date de début dans le passé ou une fin avant le début
     Alors il n'est pas enregistré et l'erreur est expliquée
 
+  Plan du Scénario: Limites de saisie
+    Quand j'enregistre un événement avec <champ> égal à <valeur>
+    Alors la saisie est <résultat>
+
+    Exemples:
+      | champ       | valeur                  | résultat                                   |
+      | capacité    | 1                       | acceptée                                   |
+      | capacité    | 10 000                  | acceptée                                   |
+      | capacité    | 10 001                  | refusée (entre 1 et 10 000 places)         |
+      | prix        | 99 999,999 TND          | acceptée                                   |
+      | prix        | 100 000 TND             | refusée (99 999,999 TND au plus)           |
+      | prix        | 12,5001 TND             | refusée (3 décimales au plus)              |
+      | titre       | 200 caractères          | acceptée                                   |
+      | titre       | 201 caractères          | refusée                                    |
+      | lieu        | 200 caractères          | acceptée                                   |
+      | lieu        | 201 caractères          | refusée                                    |
+      | description | 4 000 caractères        | acceptée                                   |
+      | description | 4 001 caractères        | refusée                                    |
+
   Scénario: Augmenter la capacité
     Étant donné un événement de 20 places complet
     Quand je passe la capacité à 25
@@ -600,6 +665,29 @@ Fonctionnalité: Gestion des événements
     Alors un avertissement me rappelle de prévenir les inscrits
     Et après confirmation, la modification est enregistrée et les réservations sont conservées
 
+  Scénario: Changer uniquement le lieu d'un événement avec des inscrits
+    Étant donné un événement avec des réservations actives
+    Quand je ne modifie que son lieu (ni date, ni heure, ni prix)
+    Alors la modification est enregistrée sans avertissement
+    Et les réservations sont conservées
+
+  Scénario: Modifier un événement déjà commencé
+    Étant donné un événement publié qui a commencé il y a 1 heure et qui se termine dans 2 heures
+    Quand je modifie sa description
+    Alors la modification est enregistrée
+
+  Scénario: Déplacer le début d'un événement commencé dans le passé
+    Étant donné un événement publié qui a déjà commencé
+    Quand je change sa date de début pour une autre date passée
+    Alors la modification est refusée
+    Et l'erreur sur la date de début est expliquée
+
+  Scénario: Événement terminé ou annulé
+    Étant donné un événement terminé, ou un événement annulé
+    Quand j'essaie de le modifier
+    Alors la modification est refusée
+    Et un message explique qu'un événement terminé ou annulé ne peut plus être modifié
+
   Scénario: Dépublier un événement sans réservation active
     Étant donné un événement publié sans réservation en attente ni confirmée
     Quand je le dépublie
@@ -610,7 +698,20 @@ Fonctionnalité: Gestion des événements
     Quand je tente de le dépublier
     Alors l'action est refusée
     Et on me propose d'annuler l'événement à la place
+
+  Scénario: Supprimer un brouillon jamais publié
+    Étant donné un événement en "Brouillon" qui n'a jamais été publié
+    Quand je le supprime après confirmation
+    Alors il disparaît définitivement
+
+  Scénario: Brouillon qui a déjà été publié
+    Étant donné un événement publié puis dépublié, revenu en "Brouillon"
+    Quand je tente de le supprimer
+    Alors la suppression est refusée
+    Et un message explique qu'un événement déjà publié ne peut pas être supprimé
 ```
+
+La suppression d'un événement **publié** n'est pas possible avant l'étape 7 ; à partir de l'étape 7, la règle R15 (aucune réservation, jamais) s'applique (voir US-E3 et Q29).
 
 #### US-E3 — Annuler ou supprimer un événement *(modifiée : demandes en attente)*
 > En tant qu'**administrateur**, je veux **annuler un événement qui n'aura pas lieu** afin que **les inscrits le sachent et que plus personne ne réserve**.
@@ -646,6 +747,8 @@ Fonctionnalité: Annulation et suppression d'un événement
     Quand je consulte ses actions possibles
     Alors je ne peux ni le republier ni le rendre réservable
 ```
+
+Note v4 : un brouillon jamais publié est déjà supprimable depuis l'étape 2 (US-E2). Le scénario « Supprimer un événement sans aucune réservation » ci-dessus (étape 7) étend la suppression aux événements publiés qui n'ont jamais eu de réservation.
 
 #### US-E4 — Voir les inscrits et les demandes d'un événement *(modifiée)*
 > En tant qu'**administrateur**, je veux **voir les demandes et les inscrits d'un événement** afin de **traiter les demandes, préparer l'accueil et prévenir les participants**.
@@ -770,8 +873,8 @@ Fonctionnalité: Suivi du paiement
     Et il est indiqué que le paiement se fait sur place
 ```
 
-#### US-E8 — Configurer le numéro de contact *(nouvelle)*
-> En tant qu'**administrateur**, je veux **définir le numéro de téléphone à contacter pour les réservations** afin que **les utilisateurs joignent la bonne personne**.
+#### US-E8 — Configurer le numéro de contact *(nouvelle ; v4 : numéro fixe, retrait du numéro)*
+> En tant qu'**administrateur**, je veux **définir ou retirer le numéro de téléphone à contacter pour les réservations** afin que **les utilisateurs joignent la bonne personne**.
 
 ```gherkin
 Fonctionnalité: Numéro de contact
@@ -783,6 +886,10 @@ Fonctionnalité: Numéro de contact
     Quand j'enregistre le numéro "+216 20 123 456" en indiquant qu'il est joignable sur WhatsApp
     Alors ce numéro est affiché aux utilisateurs après chaque demande
 
+  Scénario: Numéro fixe accepté
+    Quand j'enregistre le numéro "+216 71 123 456" (téléphone fixe)
+    Alors il est enregistré
+
   Scénario: Changer de numéro
     Étant donné que le numéro de contact a été changé
     Quand un utilisateur consulte une demande en attente faite avant le changement
@@ -792,10 +899,22 @@ Fonctionnalité: Numéro de contact
     Quand j'enregistre le numéro "abc"
     Alors il n'est pas enregistré et le format attendu est expliqué
 
+  Scénario: Numéro international refusé
+    Quand j'enregistre le numéro "+33 6 12 34 56 78"
+    Alors il n'est pas enregistré et le format attendu est expliqué
+
+  Scénario: Retirer le numéro de contact
+    Étant donné qu'un numéro de contact est enregistré
+    Quand je le retire après confirmation
+    Alors plus aucun numéro n'est configuré
+    Et les utilisateurs ne voient plus de numéro (voir US-D4)
+    Et l'option WhatsApp est désactivée
+
   Scénario: Numéro non configuré
-    Étant donné qu'aucun numéro de contact n'est enregistré
+    Étant donné qu'aucun numéro de contact n'est enregistré (jamais enregistré ou retiré)
     Quand j'essaie de publier un événement
     Alors un avertissement m'indique que les utilisateurs ne sauront pas qui contacter
+    Et la publication est quand même effectuée (l'avertissement ne bloque pas)
 ```
 
 ### Épique F — Protection des données (loi n° 2004-63)
@@ -893,19 +1012,19 @@ Fonctionnalité: Mon profil
 | R5 | Réservation en deux temps | La demande de l'utilisateur crée une réservation **En attente** qui **occupe une place**. Seul un admin la passe en **Confirmée** ou **Refusée** (motif facultatif). Cycle de vie complet : § 2. |
 | R6 | Expiration | Une demande En attente expire à l'échéance : **48 h après la demande, ou au début de l'événement si c'est plus tôt**. Elle passe en **Expirée** et la place est libérée. Une demande expirée ne peut plus être confirmée. |
 | R7 | Places restantes | **Capacité − (En attente + Confirmées)**, visible de tous *(défaut)*. |
-| R8 | Contact de l'admin | **Un seul numéro de contact** pour toute l'association, configuré par un admin, avec l'indication « joignable sur WhatsApp » ou non *(défaut)*. Il est affiché à l'utilisateur après sa demande, sur ses demandes en attente et quand il ne peut plus annuler lui-même. Il n'est pas affiché aux visiteurs. |
+| R8 | Contact de l'admin | **Un seul numéro de contact** pour toute l'association, configuré par un admin, avec l'indication « joignable sur WhatsApp » ou non *(défaut)*. **Un admin peut aussi le retirer** (plus aucun numéro n'est alors configuré et l'option WhatsApp est désactivée). Il est affiché à l'utilisateur après sa demande, sur ses demandes en attente et quand il ne peut plus annuler lui-même. Quand aucun numéro n'est configuré, un message indique à l'utilisateur que l'association n'a pas communiqué de numéro pour le moment *(défaut)*. Il n'est pas affiché aux visiteurs. |
 | R9 | Annulation par l'utilisateur | Demande **En attente** : possible jusqu'au début de l'événement. Réservation **Confirmée** : possible jusqu'à **24 h avant le début** (limite comprise) *(défaut J-1)*. La place est libérée immédiatement. |
 | R10 | Annulation par l'admin | Possible à tout moment **avant la fin** de l'événement, sur une réservation En attente ou Confirmée. Statut « Annulée par l'association ». |
-| R11 | Capacité | Nombre entier ≥ 1. L'admin peut l'augmenter librement. Il **ne peut pas la réduire sous le nombre de réservations actives** (En attente + Confirmées) : la modification est refusée avec un message *(défaut)*. |
-| R12 | Prix | **Facultatif**, en **dinars tunisiens (TND)**, ≥ 0, jusqu'à 3 décimales (millimes). Vide ou 0 = **Gratuit**. Affiché « X TND, à régler sur place ». Modifier le prix ou la date d'un événement qui a des inscrits est permis après un avertissement ; les réservations sont conservées et l'association prévient elle-même les inscrits. |
+| R11 | Capacité | Nombre entier **de 1 à 10 000**. L'admin peut l'augmenter librement (dans cette limite). Il **ne peut pas la réduire sous le nombre de réservations actives** (En attente + Confirmées) : la modification est refusée avec un message *(défaut)*. |
+| R12 | Prix | **Facultatif**, en **dinars tunisiens (TND)**, de 0 à **99 999,999 TND**, jusqu'à 3 décimales (millimes). Vide ou 0 = **Gratuit**. Affiché « X TND, à régler sur place » : **sans décimales** si le prix est entier (« 15 TND »), **avec 3 décimales** sinon (« 12,500 TND »). Modifier la date, l'heure ou le prix d'un événement qui a des inscrits est permis après un avertissement ; les réservations sont conservées et l'association prévient elle-même les inscrits. **Changer uniquement le lieu ne déclenche pas d'avertissement.** |
 | R13 | Paiement | **Hors ligne uniquement**, aucun paiement en ligne. L'admin peut ajouter (et retirer en cas d'erreur) la mention **« Payée »** sur une réservation **Confirmée** d'un événement **payant**. La date et l'admin sont enregistrés. **Aucun remboursement n'est géré dans l'application** : la mention « Payée » reste visible sur une réservation annulée, pour le suivi. |
 | R14 | Statuts d'un événement | Brouillon → Publié → (Annulé). On ne peut dépublier que s'il n'y a **aucune réservation active**. Un événement annulé est définitif, et toutes ses réservations actives passent en « Annulée par l'association ». |
-| R15 | Suppression d'un événement | Seulement s'il **n'a jamais eu de réservation**, quel qu'en soit le statut ; sinon on l'annule *(défaut)*. |
+| R15 | Suppression d'un événement | Seulement s'il **n'a jamais eu de réservation**, quel qu'en soit le statut ; sinon on l'annule *(défaut)*. **Dès l'étape 2**, un admin peut supprimer (après confirmation) un **brouillon qui n'a jamais été publié** ; un événement qui a été publié, même dépublié depuis, ne peut pas être supprimé avant l'étape 7. |
 | R16 | Liste d'attente | Aucune au MVP *(défaut)*. |
 | R17 | Notifications | Aucun e-mail ni SMS automatique au MVP : les statuts sont visibles dans l'application et le contact se fait par téléphone ou WhatsApp *(défaut)*. |
 | R18 | Actualités | Brouillon / Publiée. Triées par date de publication décroissante, **10 par page** *(défaut)*. Suppression définitive autorisée. Texte simple, sans image au MVP *(défaut)*. |
-| R19 | Affichage public des événements | Seuls les événements **à venir** sont listés, avec leur prix et leurs places restantes. Pas d'archive des événements passés au MVP *(défaut)*. |
-| R20 | Données d'un compte | **Prénom, nom, e-mail, téléphone, mot de passe** (conservé uniquement sous forme hachée), plus : la **date de création du compte** (affichée à l'utilisateur, US-F3) ; la **date de dernière connexion** (pour repérer les comptes inactifs depuis 3 ans, R25) ; le **consentement** (date d'acceptation et **version de la politique de confidentialité acceptée**, R24). Aucune autre donnée : en particulier ni date de naissance ni information d'âge. Le téléphone est **obligatoire** car il sert au contact avant la confirmation *(à confirmer en Q8)*. Format accepté : **uniquement « +216 » suivi de exactement 8 chiffres** (exemple : +216 20 123 456). Refusés : saisie locale sans préfixe, préfixe « 00 », numéros internationaux. Les espaces de présentation sont tolérés à la saisie *(défaut)*. L'e-mail est unique, sans tenir compte des majuscules. |
+| R19 | Affichage public des événements | La **liste** montre les événements **publiés ou annulés qui ne sont pas terminés** (un événement en cours reste listé jusqu'à sa fin, avec « Réservations closes »), avec leur prix et leurs places restantes, triés du plus proche au plus lointain, **20 par page** *(défaut)*. Pas d'archive des événements passés dans la liste au MVP *(défaut)*. Le **détail** d'un événement publié ou annulé **reste accessible par son adresse même une fois terminé** (historique conservé, utile à « Mes réservations »). Un brouillon n'est jamais visible. |
+| R20 | Données d'un compte | **Prénom, nom, e-mail, téléphone, mot de passe** (conservé uniquement sous forme hachée), plus : la **date de création du compte** (affichée à l'utilisateur, US-F3) ; la **date de dernière connexion** (pour repérer les comptes inactifs depuis 3 ans, R25) ; le **consentement** (date d'acceptation et **version de la politique de confidentialité acceptée**, R24). Aucune autre donnée : en particulier ni date de naissance ni information d'âge. Le téléphone est **obligatoire** car il sert au contact avant la confirmation *(à confirmer en Q8)*. Format accepté : **uniquement « +216 » suivi de exactement 8 chiffres, numéro mobile ou fixe** (exemples : +216 20 123 456, +216 71 123 456). Refusés : saisie locale sans préfixe, préfixe « 00 », numéros internationaux. Les espaces de présentation sont tolérés à la saisie *(défaut)*. L'e-mail est unique, sans tenir compte des majuscules. La même règle de format s'applique au numéro de contact de l'association (R8, Q17). |
 | R21 | Mot de passe et connexion | Au moins **8 caractères**, dont une lettre et un chiffre *(défaut)*. Blocage **15 min après 5 échecs** *(défaut)*. Pas de vérification de l'e-mail au MVP *(défaut)*. |
 | R22 | Administrateurs | Pas d'inscription en tant qu'admin : le **premier admin est créé à l'installation**, les suivants sont désignés manuellement au MVP. Il doit toujours rester **au moins un admin**. |
 | R23 | Suppression de compte | Immédiate et définitive. Les réservations à venir (En attente ou Confirmées) sont **annulées** et leurs places libérées. Les autres réservations sont **rendues anonymes**. |
@@ -913,6 +1032,8 @@ Fonctionnalité: Mon profil
 | R25 | Conservation des données | Un compte inactif depuis **3 ans** (mesuré avec la date de dernière connexion, ou à défaut la date de création) est à supprimer *(défaut ; traitement manuel ou plus tard)*. |
 | R26 | Heure de référence | Toutes les dates et heures sont en **heure de Tunis (Africa/Tunis, UTC+1, sans changement d'heure)**. |
 | R27 | Langue | Application **en français uniquement**. |
+| R28 | Modification d'un événement | Un admin peut modifier un événement (brouillon ou publié) tant qu'il n'est **ni terminé ni annulé**, **y compris s'il a déjà commencé**. Sur un événement commencé, la date de début **ne peut pas être déplacée dans le passé** (une date de début inchangée reste acceptée). Un événement **terminé** (heure de fin dépassée) ou **annulé** ne peut plus être modifié. La date de fin d'un événement commencé ne peut pas être placée dans le passé *(défaut, voir Q28)*. |
+| R29 | Limites de saisie des textes | **Titre** et **lieu** : 200 caractères au plus. **Description** : 4 000 caractères au plus. Titre, lieu et description sont obligatoires. Les limites de capacité et de prix sont en R11 et R12. |
 
 ### Points à signaler à l'agent `architecte` (décisions techniques, hors de mon rôle)
 - Garantir qu'on ne dépasse **jamais** la capacité quand deux personnes demandent la dernière place en même temps (US-D1).
@@ -924,6 +1045,9 @@ Fonctionnalité: Mon profil
 - Anonymisation des réservations lors de la suppression d'un compte (R23).
 - Création du premier administrateur à l'installation (R22).
 - Stockage de `CreatedAt`, `LastLoginAt` et de la version de la politique acceptée (R20) ; mise à jour de `LastLoginAt` à la connexion (US-A2) ; règle de validation du téléphone « +216 + 8 chiffres » (R20).
+- **(v4) Retrait du numéro de contact** (R8, US-E8) : prévoir l'opération « retirer » (le plan d'étape 2 n'enregistre qu'un numéro valide) et la remise de l'option WhatsApp à « non ».
+- **(v4) Suppression d'un brouillon jamais publié** (R15, US-E2) : il faut pouvoir savoir qu'un événement **a déjà été publié**, même après dépublication (la date de publication est aujourd'hui remise à vide à la dépublication) ; prévoir aussi le point d'entrée de suppression.
+- **(v4) Événement terminé** : le détail public doit permettre d'indiquer « terminé » (la liste publique du plan ne l'expose pas, voir le récapitulatif).
 
 ---
 
@@ -945,9 +1069,35 @@ Fonctionnalité: Mon profil
 | Q12 | Une **déclaration à l'INPDP** est-elle nécessaire pour ce traitement ? Qui s'en charge ? | À vérifier par l'association avant la mise en ligne. |
 | Q13 | Qui rédige la **politique de confidentialité**, et quel est le **contact** pour les questions sur les données ? | Un modèle simple fourni avec l'application ; contact : l'e-mail de l'association. |
 | Q14 | Combien de temps **garder** les comptes inactifs et l'historique des réservations ? | 3 ans d'inactivité ; historique rendu anonyme et conservé. |
-| Q15 | Les actualités ont-elles besoin d'**images** ou de pièces jointes ? Faut-il **archiver** les événements passés ? | Non au MVP. |
+| Q15 | Les actualités ont-elles besoin d'**images** ou de pièces jointes ? Faut-il **archiver** les événements passés ? | Non au MVP (pas d'archive dans la liste ; le détail d'un événement terminé reste accessible, voir Q19). |
 | Q16 | Quand la **politique de confidentialité change**, faut-il redemander l'accord aux membres déjà inscrits ? | Non au MVP : on conserve seulement la version acceptée à l'inscription ; à revoir plus tard. |
-| Q17 | Le **numéro de contact de l'association** (US-E8) doit-il suivre la même règle que le téléphone des membres (+216 + 8 chiffres) ? | Oui, même règle (le texte de US-E8 n'est pas modifié à ce stade). |
+| Q17 | Le **numéro de contact de l'association** (US-E8) doit-il suivre la même règle que le téléphone des membres (+216 + 8 chiffres) ? | **Résolue (v4)** : oui, même règle ; un numéro **fixe** tunisien est accepté (« +216 » + 8 chiffres, mobile ou fixe). (Plan d'étape 2 : E2-12.) |
+
+### Questions de l'étape 2 (issues du plan d'architecte, E2-1 à E2-13) — toutes résolues en v4
+
+Réponses du porteur ou valeur par défaut du plan d'architecte retenue. La colonne « Réf. plan » renvoie au plan d'étape 2.
+
+| # | Réf. plan | Question | Décision | Origine |
+|---|---|---|---|---|
+| Q18 | E2-1 | Un événement **en cours** (commencé, pas terminé) figure-t-il dans la liste ? | Oui, listé jusqu'à sa fin, avec « Réservations closes » (R19, US-C1). | Défaut du plan |
+| Q19 | E2-2 | Le détail d'un événement **terminé** reste-t-il accessible ? | **Oui** : accessible par son adresse (historique conservé), absent de la liste (R19, US-C2). | **Porteur** (confirme le défaut) |
+| Q20 | E2-3 | Format d'affichage du prix ? | Entier sans décimales (« 15 TND »), sinon 3 décimales (« 12,500 TND ») (R12, US-C1). | Défaut du plan |
+| Q21 | E2-4 | Un changement de **lieu** déclenche-t-il l'avertissement aux inscrits ? | Non : seuls date, heure et prix (R12, US-E2). | Défaut du plan |
+| Q22 | E2-5 | **Limites de saisie** ? | Capacité 1 à 10 000 ; prix jusqu'à 99 999,999 TND ; titre et lieu 200 caractères ; description 4 000 (R11, R12, R29, US-E2). | **Porteur** (valeurs logiques validées) |
+| Q23 | E2-6 | Peut-on modifier un événement **commencé** ou **annulé** ? | **Commencé : oui** (début non déplaçable dans le passé) ; **terminé ou annulé : non** (R28, US-E2). | **Porteur** (commencé) ; défaut du plan (terminé, annulé) |
+| Q24 | E2-7 | Un admin peut-il **retirer** le numéro de contact ? | **Oui** (R8, US-E8, US-D4). Le plan prévoyait « non » : voir récapitulatif. | **Porteur** (écart avec le défaut) |
+| Q25 | E2-8 | L'avertissement « numéro non configuré » à la publication est-il bloquant ? | Non : la publication est effectuée avec l'avertissement (US-E8). | Défaut du plan |
+| Q26 | E2-9 | Peut-on **supprimer un brouillon** créé par erreur avant l'étape 7 ? | **Oui**, uniquement s'il n'a **jamais été publié** (R15, US-E2). Le plan prévoyait « non » : voir récapitulatif. | **Porteur** (écart avec le défaut) |
+| Q27 | E2-13 | Taille de page de la liste publique des événements ? | 20 (R19, US-C1). | Défaut du plan |
+
+Les points E2-10 (type du prix `decimal(9,3)`) et E2-11 (abandon de l'objet valeur `Money`) sont des choix **techniques** : ils relèvent de l'architecte (ADR 0010) et ne figurent pas ici. E2-12 est traitée avec Q17.
+
+Questions restées ouvertes à la suite des décisions v4 :
+
+| # | Question | Valeur par défaut en attendant |
+|---|---|---|
+| Q28 | Sur un événement **déjà commencé**, peut-on placer la **date de fin dans le passé** (ce qui le rendrait immédiatement « terminé ») ? | Non : la fin doit rester dans le futur (R28). Le plan d'étape 2 ne le contrôle pas encore. |
+| Q29 | À partir de l'étape 7, un **événement publié qui n'a jamais eu de réservation** peut-il être supprimé (R15 d'origine), alors que la décision v4 ne vise que le brouillon jamais publié ? | Oui : R15 d'origine s'applique à partir de l'étape 7 (US-E3), la décision v4 est une anticipation limitée aux brouillons. |
 
 ---
 
@@ -979,7 +1129,7 @@ Si le temps manque, ces éléments peuvent passer en « plus tard » sans casser
 - Plusieurs places par réservation, liste d'attente.
 - Gestion des administrateurs depuis l'interface (promouvoir ou retirer un admin).
 - Modification du profil, export de mes données.
-- Numéro de contact par événement, images dans les actualités, archive des événements passés.
+- Numéro de contact par événement, images dans les actualités, archive des événements passés (page dédiée dans la liste ; le détail d'un événement terminé reste déjà accessible par son adresse).
 - Suivi des remboursements, récapitulatif des encaissements par événement.
 - Purge automatique des comptes inactifs, statistiques de fréquentation.
 - Événements réservés aux adhérents.
@@ -990,7 +1140,7 @@ Si le temps manque, ces éléments peuvent passer en « plus tard » sans casser
 L'idée : construire d'abord le **cœur métier testable** (la réservation, son cycle de vie et ses règles), puis l'habillage.
 
 1. **Comptes** : US-A1, US-A2 (+ création du premier admin, R22). Tout le reste en dépend.
-2. **Événements côté admin** : US-E2 (création, prix, publication, capacité) et US-E8 (numéro de contact).
+2. **Événements côté admin** : US-E2 (création, prix, publication, capacité, modification, suppression d'un brouillon jamais publié) et US-E8 (numéro de contact, y compris son retrait).
 3. **Consultation des événements** : US-C1, US-C2.
 4. **Demande de réservation** : US-D1 et US-D4. C'est le cœur : complet, doublon, dernière place.
 5. **Traitement des demandes** : US-E6 (confirmer / refuser) puis US-D5 (expiration). On boucle ainsi le cycle de vie du § 2.

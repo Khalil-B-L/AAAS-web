@@ -1,3 +1,4 @@
+using Aaas.Application.Abstractions;
 using Aaas.Application.Accounts;
 using Aaas.Application.Options;
 using Aaas.Infrastructure.Identity;
@@ -60,6 +61,11 @@ public static class DependencyInjection
                     (RelationalEventId.ConnectionError, LogLevel.Debug),
                     (RelationalEventId.TransactionError, LogLevel.Debug)));
         });
+
+        // Même instance que AppDbContext pour toute la requête (scoped) : Identity, services et verrou partagent
+        // le suivi des entités et la transaction en cours.
+        services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<IEventLock, EventLock>();
 
         services
             .AddIdentityCore<AppUser>(options =>
