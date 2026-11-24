@@ -1,0 +1,64 @@
+@if (notFound()) {
+  <app-not-found />
+} @else if (apiError(); as error) {
+  <section class="page">
+    <div class="banner banner--error" role="alert">
+      <p>{{ error.message }}</p>
+      <button mat-stroked-button type="button" (click)="event.reload()">Réessayer</button>
+    </div>
+  </section>
+} @else if (event.isLoading()) {
+  <app-loading />
+} @else if (detail(); as e) {
+  <article class="page">
+    <a routerLink="/evenements">← Retour aux événements</a>
+    <h1>{{ e.title }}</h1>
+
+    @if (e.status === 'Cancelled') {
+      <p class="banner banner--error" role="status">Cet événement a été annulé.</p>
+    } @else if (e.hasEnded) {
+      <p class="banner banner--info" role="status">Cet événement est terminé.</p>
+    }
+
+    <dl class="facts">
+      <div>
+        <dt>Date et heure</dt>
+        <dd>
+          @if (sameDay(e.startsAt, e.endsAt)) {
+            {{ e.startsAt | date: detailFormat }}, fin à {{ e.endsAt | date: timeFormat }}
+          } @else {
+            Du {{ e.startsAt | date: detailFormat }} au {{ e.endsAt | date: detailFormat }}
+          }
+          <span class="muted">(heure de Tunis)</span>
+        </dd>
+      </div>
+      <div>
+        <dt>Lieu</dt>
+        <dd>{{ e.location }}</dd>
+      </div>
+      <div>
+        <dt>Prix</dt>
+        <dd>{{ e.price | tndPrice }}</dd>
+      </div>
+      <div>
+        <dt>Places</dt>
+        <dd>
+          @if (mention(); as m) {
+            {{ m.label }}
+          }
+        </dd>
+      </div>
+    </dl>
+
+    <h2>Description</h2>
+    <!-- Interpolation {{ }} : le texte est échappé (pas d'injection HTML) ; les retours à la ligne sont gardés en CSS. -->
+    <p class="description">{{ e.description }}</p>
+
+    @if (e.isBookable && !auth.isLoggedIn()) {
+      <div class="actions">
+        <a mat-flat-button routerLink="/connexion" [queryParams]="loginQueryParams()">Demander une place</a>
+        <span class="muted">Connectez-vous ou <a routerLink="/inscription" [queryParams]="loginQueryParams()">créez un compte</a> pour demander une place.</span>
+      </div>
+    }
+  </article>
+}

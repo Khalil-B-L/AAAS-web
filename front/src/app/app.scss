@@ -1,0 +1,24 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+  outline: none;
+}
+
+// Lien d'évitement : invisible sauf au clavier (Tab), pour sauter le menu.
+.skip-link {
+  position: absolute;
+  left: -100vw;
+  top: 0.5rem;
+  z-index: 10;
+  padding: 0.5rem 1rem;
+  background: var(--mat-sys-surface);
+
+  &:focus {
+    left: 0.5rem;
+  }
+}

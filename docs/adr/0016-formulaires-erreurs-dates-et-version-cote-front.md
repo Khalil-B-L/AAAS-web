@@ -1,6 +1,6 @@
 # ADR 0016 — Front : formulaires, erreurs ProblemDetails, dates de Tunis et version (409)
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 23/11/2026) — formats de date (UX-4), conflit (UX-6) et actions bloquées (UX-7) validés
 - **Date** : 20/11/2026
 - **Mise en œuvre** : semaine 2, tâches T2, T4, T8, T9 du plan [`plan-front-angular.md`](../technique/plan-front-angular.md)
 - **Références** : api.md (conventions, `ProblemDetails`, `code`, `errors`, `version`) ; ADR 0003 (UTC, `toTunisIso`, `DATE_PIPE_DEFAULT_OPTIONS`), ADR 0006 et 0012 (version, `registrants_warning`), ADR 0009 (date avec décalage obligatoire), ADR 0010 (prix TND), ADR 0011 (pagination) ; mvp R12, R20, R21, R26
@@ -79,6 +79,14 @@ L'API renvoie des erreurs normalisées : `title` en français affichable tel que
 - Les secondes d'une date ne sont pas éditables (champ à la minute) : un événement créé hors du front avec des secondes verrait son début « modifié » au premier enregistrement (et refusé s'il a commencé). Risque faible, à tester.
 - Tous les comportements ci-dessus sont des fonctions pures ou de petits composants : testables sans navigateur avec Vitest.
 
-## Reste à valider par le porteur
+## Validation et mise en œuvre
 
-- Formats de date (UX-4), comportement sur conflit (UX-6), blocage des actions quand le formulaire est modifié (UX-7).
+- Validé par le porteur le 23/11/2026 (valeurs par défaut).
+- Code : `core/errors/` (`toApiError`, `applyServerErrors`), `core/time/` (`tunis-time.ts`, `date-formats.ts`), `core/config/formatting.providers.ts` (locale et fuseau du `DatePipe`), `shared/forms/` (validateurs, messages, `<app-field-errors>`), `features/admin/events/admin-event-form/` (version, 409).
+- Précisions de mise en œuvre :
+  - textes généraux alignés sur `docs/fonctionnel/libelles-ecrans.md` (v1.0) : erreur réseau « …Vérifiez votre connexion et réessayez. », erreur inattendue « Un problème est survenu. Veuillez réessayer plus tard. », 403 « Vous n'avez pas le droit d'effectuer cette action. » ;
+  - `concurrent_update` sur la fiche événement : titre et texte de `libelles-ecrans.md` (« Événement modifié par un autre administrateur… »), boutons « Recharger » / « Fermer » ; sur le numéro de contact : texte de l'API ;
+  - `account_locked` : le bandeau affiche le `title` de l'API (avec la durée de blocage) plutôt que le texte générique de `libelles-ecrans.md`, plus précis pour le membre ; à confirmer par l'expert fonctionnel ;
+  - `toApiError` déballe aussi l'erreur d'un `rxResource` (la `HttpErrorResponse` est dans `cause`) ;
+  - un identifiant d'URL qui n'est pas un GUID affiche « Contenu introuvable » **sans appeler l'API** : pour un visiteur, la route `{id:guid}` ne correspond pas et l'API répond 401 (et non le 404 annoncé par `api.md`, écart signalé dans `etat-avancement.md`) ;
+  - l'erreur « fin avant début » est portée par le groupe et affichée sous « Fin » grâce à un `ErrorStateMatcher` (`GroupErrorStateMatcher`).

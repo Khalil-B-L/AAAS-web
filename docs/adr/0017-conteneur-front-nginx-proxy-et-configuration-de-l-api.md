@@ -1,6 +1,6 @@
 # ADR 0017 — Conteneur du front (nginx), proxy `/api` et adresse de l'API
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 23/11/2026) — port 4200 partagé entre `ng serve` et le conteneur (UX-11) validé
 - **Date** : 20/11/2026
 - **Mise en œuvre** : semaine 2, tâches T0 (proxy de développement) et T1 (Docker) du plan [`plan-front-angular.md`](../technique/plan-front-angular.md) ; partie Azure en S3
 - **Références** : cahier § 6.2 (CORS limité au front), § 7 (Dockerfile du front, `docker compose`), § 10 point 7 ; architecture § 7, § 11 ; ADR 0002 (CSP), ADR 0014, ADR 0015 ; `docs/revision/docker.md`
@@ -60,6 +60,12 @@ L'API autorise déjà CORS pour `Cors:AllowedOrigins` (en-têtes `Authorization`
 - La CSP impose de ne charger ni police ni script externe ; tout ajout futur (assistant RAG, S4) passe par l'API.
 - En S3 : `staticwebapp.config.json` (`navigationFallback`, `globalHeaders` avec la même CSP, `connect-src` élargi à l'URL d'App Service) et `Cors:AllowedOrigins` = URL de Static Web Apps.
 
-## Reste à valider par le porteur
+## Validation et mise en œuvre
 
-- Port 4200 partagé entre `ng serve` et le conteneur (sinon publier le conteneur sur `127.0.0.1:8081`).
+- Validé par le porteur le 23/11/2026 (valeurs par défaut).
+- Images épinglées : `node:24.22.3-alpine3.24` (compilation), `nginxinc/nginx-unprivileged:1.30.6-alpine3.24` (image finale, 61 Mo, UID 101).
+- Fichiers : `front/Dockerfile`, `front/.dockerignore`, `front/nginx/default.conf`, `front/nginx/security-headers.conf`, `front/proxy.conf.mjs`, service `front` de `docker-compose.yml`.
+- Précisions de mise en œuvre :
+  - en-têtes de sécurité dans un fichier inclus par chaque `location` (une `location` qui définit un `add_header` n'hérite plus de ceux du `server`) ; CSP complétée par `object-src 'none'`, ajout de `Permissions-Policy` ;
+  - fichiers à empreinte reconnus par `^/(main|polyfills|styles|chunk)-[A-Za-z0-9_-]{8}\.(js|css)$` et `/media/` (regex entre guillemets : les accolades ne passent pas sinon) ;
+  - vérifié le 23/11/2026 sur une pile jetable (réseau `aaas-e2e`, port 4300, script `front/e2e/pile-e2e.sh`) : repli SPA, relais `/api`, cache, gzip, `/healthz`, utilisateur non-root, aucune violation CSP dans un vrai navigateur (Edge sans interface).

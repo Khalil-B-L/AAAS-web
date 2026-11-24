@@ -1,6 +1,8 @@
 # Plan — Semaine 2 : front Angular
 
 > Rédigé par l'agent `architecte` le 20/11/2026. Référence : cahier des charges v1.2, `fonctionnel/mvp.md` v4, `technique/api.md` (étape 2). Décisions : ADR [0014](../adr/0014-front-angular-version-structure-et-conventions.md) (version, structure), [0015](../adr/0015-session-jwt-cote-front.md) (session JWT), [0016](../adr/0016-formulaires-erreurs-dates-et-version-cote-front.md) (formulaires, erreurs, dates, 409), [0017](../adr/0017-conteneur-front-nginx-proxy-et-configuration-de-l-api.md) (Docker, nginx, proxy). Aucun code n'est écrit à ce stade : ce plan est destiné à l'`expert-technique` (réalisation), au `testeur` (§ 21) et au porteur (§ 22).
+>
+> **Réalisé le 23/11/2026 (T0 à T10)** : valeurs par défaut du § 22 validées par le porteur, ADR 0014 à 0017 acceptés. Écarts de mise en œuvre listés dans chaque ADR (« Validation et mise en œuvre ») ; état, vérifications et reste à faire : [`etat-avancement.md`](etat-avancement.md).
 
 ---
 

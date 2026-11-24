@@ -1,0 +1,153 @@
+@switch (loadState()) {
+  @case ('loading') {
+    <app-loading />
+  }
+  @case ('not-found') {
+    <app-not-found />
+  }
+  @case ('error') {
+    <section class="page">
+      <div class="banner banner--error" role="alert">
+        <p>{{ loadError() }}</p>
+        <button mat-stroked-button type="button" (click)="reload()">Réessayer</button>
+      </div>
+    </section>
+  }
+  @default {
+    <section class="page">
+      <a routerLink="/admin/evenements">← Retour à la liste</a>
+      <h1>{{ isNew() ? 'Nouvel événement' : "Modifier l'événement" }}</h1>
+
+      @if (event(); as e) {
+        <p class="meta">
+          @for (label of statusLabels(); track label) {
+            <span class="chip">{{ label }}</span>
+          }
+          <span class="muted">
+            {{ e.pendingCount }} en attente, {{ e.confirmedCount }} confirmées, {{ e.remainingSeats }} places libres
+          </span>
+        </p>
+        @if (e.publishedAt) {
+          <p class="muted small">Publié le {{ e.publishedAt | date: detailFormat }}</p>
+        }
+        @if (readOnly()) {
+          <p class="banner banner--info" role="status">
+            {{ e.status === 'Cancelled' ? 'Cet événement a été annulé.' : 'Cet événement est terminé.' }}
+            Il ne peut plus être modifié.
+          </p>
+        }
+      }
+
+      @for (warning of warnings(); track warning.code) {
+        <div class="banner banner--warning" role="status">
+          <p>{{ warning.message }}</p>
+          @if (warning.code === 'contact_not_configured') {
+            <a routerLink="/admin/parametres">Configurer le numéro de contact</a>
+          }
+        </div>
+      }
+
+      @if (errorMessage(); as message) {
+        <p class="banner banner--error" role="alert">{{ message }}</p>
+      }
+
+      <form class="form-grid" [formGroup]="form" (ngSubmit)="save()" novalidate>
+        <mat-form-field>
+          <mat-label>Titre (obligatoire)</mat-label>
+          <input matInput formControlName="title" />
+          <mat-hint align="end">{{ form.controls.title.value.length }} / 200</mat-hint>
+          <mat-error><app-field-errors [control]="form.controls.title" field="title" /></mat-error>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Lieu (obligatoire)</mat-label>
+          <input matInput formControlName="location" />
+          <mat-hint align="end">{{ form.controls.location.value.length }} / 200</mat-hint>
+          <mat-error><app-field-errors [control]="form.controls.location" field="location" /></mat-error>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Description (obligatoire)</mat-label>
+          <textarea matInput formControlName="description" rows="6"></textarea>
+          <mat-hint align="end">{{ form.controls.description.value.length }} / 4 000</mat-hint>
+          <mat-error><app-field-errors [control]="form.controls.description" field="description" /></mat-error>
+        </mat-form-field>
+
+        <div class="form-row">
+          <mat-form-field>
+            <mat-label>Début (heure de Tunis)</mat-label>
+            <!-- Sélecteur natif : valeur « 2026-12-05T10:00 » SANS fuseau ; toTunisIso ajoute +01:00 à l'envoi. -->
+            <input matInput type="datetime-local" formControlName="startsAt" />
+            <mat-error><app-field-errors [control]="form.controls.startsAt" field="startsAt" /></mat-error>
+          </mat-form-field>
+
+          <mat-form-field>
+            <mat-label>Fin (heure de Tunis)</mat-label>
+            <input matInput type="datetime-local" formControlName="endsAt" [errorStateMatcher]="endMatcher" />
+            <mat-error>
+              <app-field-errors
+                [control]="form.controls.endsAt"
+                field="endsAt"
+                [extra]="form.hasError('endBeforeStart') ? [endBeforeStartMessage] : []"
+              />
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="form-row">
+          <mat-form-field>
+            <mat-label>Capacité (nombre de places)</mat-label>
+            <input matInput formControlName="capacity" inputmode="numeric" />
+            <mat-error><app-field-errors [control]="form.controls.capacity" field="capacity" /></mat-error>
+          </mat-form-field>
+
+          <mat-form-field>
+            <mat-label>Prix en TND (laisser vide si gratuit)</mat-label>
+            <!-- Texte + inputmode="decimal" plutôt que type="number" : la virgule française est acceptée partout. -->
+            <input matInput formControlName="price" inputmode="decimal" />
+            <mat-error><app-field-errors [control]="form.controls.price" field="price" /></mat-error>
+          </mat-form-field>
+        </div>
+
+        @if (!readOnly()) {
+          <div class="actions">
+            <button mat-flat-button type="submit" [disabled]="busy()">Enregistrer</button>
+            <a mat-button routerLink="/admin/evenements">Annuler</a>
+          </div>
+        }
+      </form>
+
+      @if (!isNew() && (canPublish() || canUnpublish() || canDelete())) {
+        <div class="state-actions">
+          <h2>Publication</h2>
+          @if (dirty()) {
+            <p class="muted" id="aide-actions">Enregistrez d'abord vos modifications.</p>
+          }
+          <div class="actions">
+            @if (canPublish()) {
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="busy() || dirty()"
+                [attr.aria-describedby]="dirty() ? 'aide-actions' : null"
+                (click)="publish()"
+              >
+                Publier
+              </button>
+            }
+            @if (canUnpublish()) {
+              <button mat-stroked-button type="button" [disabled]="busy() || dirty()" (click)="unpublish()">
+                Dépublier
+              </button>
+            }
+            @if (canDelete()) {
+              <button mat-stroked-button type="button" class="danger" [disabled]="busy() || dirty()" (click)="remove()">
+                Supprimer ce brouillon
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </section>
+  }
+}

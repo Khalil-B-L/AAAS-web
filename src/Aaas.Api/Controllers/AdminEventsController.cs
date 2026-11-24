@@ -1,5 +1,6 @@
 using Aaas.Api.Auth;
 using Aaas.Application.Common;
+using Aaas.Application.Common.Errors;
 using Aaas.Application.Events;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -70,4 +71,15 @@ public sealed class AdminEventsController(AdminEventService events) : Controller
         await events.DeleteAsync(id, cancellationToken);
         return NoContent();
     }
+
+    /// <summary>
+    /// Identifiant mal formé sur les routes ci-dessus : 404 pour un admin. Ces routes héritent de AdminOnly, donc un
+    /// visiteur reçoit 401 et un membre 403 (sans elles, un membre connecté passait la politique de repli et recevait
+    /// 404 : il apprenait que l'identifiant était mal formé avant d'être refusé).
+    /// </summary>
+    [AcceptVerbs("GET", "PUT", "DELETE", Route = "{id}")]
+    [HttpPost("{id}/publish")]
+    [HttpPost("{id}/unpublish")]
+    [ApiExplorerSettings(IgnoreApi = true)]
+    public void MalformedId() => throw new NotFoundException(AdminEventService.NotFoundMessage);
 }

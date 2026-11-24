@@ -1,0 +1,65 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 64px;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: inherit;
+  text-decoration: none;
+  font: var(--mat-sys-title-large);
+  margin-right: auto;
+}
+
+.brand__logo {
+  height: 40px;
+  width: auto;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.active {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.menu-toggle {
+  display: none;
+}
+
+// Téléphone : le menu passe sous l'en-tête et se replie derrière le bouton « Menu ».
+@media (max-width: 47.99rem) {
+  .menu-toggle {
+    display: inline-flex;
+  }
+
+  .nav {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nav--open {
+    display: flex;
+  }
+}
+
+.greeting {
+  padding: 0 0.75rem;
+  font: var(--mat-sys-label-large);
+}

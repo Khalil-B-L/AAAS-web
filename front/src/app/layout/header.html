@@ -1,0 +1,40 @@
+<header class="toolbar">
+  <a class="brand" routerLink="/evenements" (click)="closeMenu()">
+    @if (appInfo.logoUrl) {
+      <img [src]="appInfo.logoUrl" alt="" class="brand__logo" />
+    }
+    <span>{{ appInfo.name }}</span>
+  </a>
+
+  <button
+    mat-button
+    type="button"
+    class="menu-toggle"
+    [attr.aria-expanded]="menuOpen()"
+    aria-controls="menu-principal"
+    (click)="toggleMenu()"
+  >
+    {{ menuOpen() ? 'Fermer le menu' : 'Menu' }}
+  </button>
+
+  <nav id="menu-principal" class="nav" [class.nav--open]="menuOpen()" aria-label="Menu principal">
+    <!-- Le menu lit des signals de AuthService : il se met à jour seul à la connexion et à la déconnexion. -->
+    @if (auth.isLoggedIn() && auth.firstName()) {
+      <span class="greeting">Bonjour {{ auth.firstName() }}</span>
+    }
+
+    <a mat-button routerLink="/evenements" routerLinkActive="active" (click)="closeMenu()">Événements</a>
+
+    @if (auth.isAdmin()) {
+      <a mat-button routerLink="/admin" routerLinkActive="active" (click)="closeMenu()">Administration</a>
+    }
+
+    @if (auth.isLoggedIn()) {
+      <a mat-button routerLink="/mon-compte" routerLinkActive="active" (click)="closeMenu()">Mon compte</a>
+      <button mat-button type="button" (click)="logout()">Se déconnecter</button>
+    } @else {
+      <a mat-button routerLink="/connexion" routerLinkActive="active" (click)="closeMenu()">Se connecter</a>
+      <a mat-flat-button routerLink="/inscription" (click)="closeMenu()">Créer un compte</a>
+    }
+  </nav>
+</header>

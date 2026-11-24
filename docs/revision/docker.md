@@ -137,16 +137,70 @@ Règle : **ce qui change rarement en haut, ce qui change souvent en bas**. Une c
 
 Vérifier la migration depuis le conteneur SQL : voir `docs/technique/exploitation.md` § 7 (`sqlcmd -I`, `MSYS_NO_PATHCONV=1` sous Git Bash).
 
+## 6 ter. Image du front : Node pour compiler, nginx pour servir (S2)
+
+Fichiers : `front/Dockerfile`, `front/nginx/default.conf`, `front/nginx/security-headers.conf`, `front/.dockerignore`, service `front` de `docker-compose.yml`. Décision : ADR 0017.
+
+```dockerfile
+FROM node:24.22.3-alpine3.24 AS build                 # ≈ 170 Mo : Node + npm, juste pour compiler
+WORKDIR /app
+COPY package.json package-lock.json ./                # dépendances d'abord (cache)
+RUN npm ci --no-audit --no-fund                       # exactement le lockfile, node_modules vide au départ
+COPY . .                                              # le code (front/.dockerignore exclut node_modules, dist…)
+RUN npx ng build --configuration production           # → /app/dist/front/browser : des fichiers statiques
+
+FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24 AS final   # ≈ 60 Mo, non-root (UID 101), port 8080
+COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
+COPY --from=build /app/dist/front/browser /usr/share/nginx/html
+EXPOSE 8080
+```
+
+| Notion | Ce qu'il faut savoir |
+|---|---|
+| **Pourquoi deux étapes** | Un front compilé n'est que du HTML/JS/CSS : il faut un serveur web, pas Node. Image finale : **61 Mo** (mesuré), contre 170 Mo pour la seule image Node. |
+| **`npm ci` vs `npm install`** | `npm ci` installe **exactement** `package-lock.json`, part d'un `node_modules` vide et échoue si le lockfile ne correspond pas à `package.json` : reproductible (≈ `dotnet restore` avec versions centralisées). `npm install` peut mettre à jour le lockfile. |
+| **Cache** | `COPY package*.json` + `npm ci` **avant** `COPY . .` : modifier un composant ne relance que les deux dernières couches. |
+| **Contexte** | `docker build front` : le contexte est `front/`, donc c'est `front/.dockerignore` qui compte (le `.dockerignore` racine exclut `front/` du contexte de l'API). Sans lui, `node_modules` Windows (des centaines de Mo) partirait au démon. |
+| **Non-root** | `nginx-unprivileged` tourne en utilisateur `nginx` (UID 101) et écoute sur **8080** : un port < 1024 exigerait root. Vérifier : `docker exec <conteneur> id`. |
+| **Repli SPA** | `try_files $uri $uri/ /index.html;` : `/evenements/42` n'existe pas sur disque, nginx renvoie `index.html` et le routeur Angular affiche la page. Sans cela, F5 sur une route profonde = 404. |
+| **Reverse proxy** | `location /api/ { proxy_pass $api_upstream; }` : le navigateur ne parle qu'à `localhost:4200`, nginx relaie vers `api:8080` sur le réseau compose → **même origine, pas de CORS** (≈ YARP devant une API). |
+| **DNS de Docker** | `resolver 127.0.0.11` + `set $api_upstream http://api:8080;` : avec une **variable**, nginx résout `api` à chaque requête (cache 10 s). Sans elle, il résout une seule fois au démarrage et renvoie 502 après `docker compose up -d --build api` (nouvelle IP). |
+| **Cache HTTP** | `index.html` : `no-cache` (toujours revalidé). `main-ABCD1234.js` : `max-age=31536000, immutable` (le nom change à chaque version). |
+| **Healthcheck HTTP** | `wget -q --spider http://127.0.0.1:8080/healthz` (BusyBox présent dans Alpine) ; `/healthz` répond sans appeler l'API. `docker compose ps` affiche `healthy`. |
+| **Configuration figée** | `environment.ts` est compilé dans le JS : changer l'URL de l'API demande de **recompiler** l'image (contrairement à l'API, qui lit ses variables d'environnement au démarrage). D'où le chemin relatif `/api`. |
+
+**Pièges rencontrés en construisant l'image**
+- **Accolades dans une regex nginx** : `location ~* ^/chunk-[A-Za-z0-9]{8}\.js$ {` fait échouer nginx (« missing closing parenthesis ») : les `{}` sont lus comme un bloc. Mettre la regex **entre guillemets**. Tester la configuration sans démarrer : `docker run --rm --entrypoint nginx aaas-front:local -t`.
+- **`add_header` et l'héritage** : dès qu'une `location` contient un `add_header`, elle n'hérite plus d'**aucun** `add_header` du niveau `server`. Les en-têtes de sécurité sont donc dans un fichier inclus dans chaque `location` (`security-headers.conf`).
+- **CSP et CSS critique** : l'optimisation `inlineCritical` d'Angular ajoute un `onload` en ligne que `script-src 'self'` bloquerait : désactivée dans `angular.json`. Vérifier dans `index.html` servi : aucun `<script>` en ligne.
+- **« can not modify /etc/nginx/conf.d/default.conf (read-only file system?) »** au démarrage : simple information du script d'entrée de l'image (il voulait ajouter l'écoute IPv6) ; le fichier appartient à root et nginx tourne en non-root. Sans effet.
+
+**À observer soi-même**
+
+```bash
+docker build -t aaas-front:local front          # 1er build : npm ci télécharge (~1 min)
+docker build -t aaas-front:local front          # 2e build : tout CACHED
+# modifier un .html, rebuild : seules COPY . . et ng build sont refaites
+docker image ls aaas-front                       # ≈ 61 Mo
+docker run --rm -p 127.0.0.1:4300:8080 aaas-front:local   # seul, sans API : /api répond 502
+curl -I http://127.0.0.1:4300/evenements/42      # 200 text/html (repli SPA) + Content-Security-Policy
+curl -I http://127.0.0.1:4300/healthz            # 200
+```
+
 ## 7. Flux complet d'une requête (vue d'ensemble du projet)
 
 Exemple : un membre clique sur « Se connecter ».
 
 ```
-[Navigateur]  composant Angular (formulaire) ── AuthService.login() ── HttpClient
-      │        (S2) l'interceptor ajoutera « Authorization: Bearer ... » aux requêtes suivantes
-      │  POST http://localhost:8080/api/auth/login   {"email":"...","password":"..."}
-      ▼        (en S2 : via nginx du conteneur front qui relaie /api vers api:8080 ; en Azure : HTTPS + CORS)
-[Hôte : port 8080] ──(port publié 8080:8080)──▶ [Conteneur api, utilisateur app]
+[Navigateur]  composant Login (formulaire) ── AuthApi.login() ── HttpClient ── authInterceptor
+      │        (l'intercepteur ajoute « Authorization: Bearer ... » aux requêtes suivantes, une fois connecté)
+      │  POST http://localhost:4200/api/auth/login   {"email":"...","password":"..."}
+      ▼
+[Hôte : port 4200] ──(port publié 127.0.0.1:4200:8080)──▶ [Conteneur front : nginx, utilisateur nginx]
+      │        location /api/ → resolver 127.0.0.11 → api:8080 (réseau compose ; en Azure : HTTPS + CORS)
+      ▼
+[Conteneur api, utilisateur app] (aussi joignable directement sur le port publié 8080, pour curl)
       ▼
  Kestrel ─▶ middlewares : ExceptionHandler → StatusCodePages → CORS → Authentication (JWT) → Authorization
       ▼
@@ -176,3 +230,7 @@ Plus tard : en **CI** (GitHub Actions), la même image est construite et publié
 - **J'ajoute un paquet NuGet : pourquoi le build Docker est-il long une fois, puis rapide ?** Le `.csproj` modifié invalide la couche du `restore` (téléchargement) ; ensuite elle est en cache tant que les fichiers de dépendances ne changent pas.
 - **`docker compose down` efface-t-il ma base ?** Non, seulement les conteneurs et le réseau ; `down -v` supprime aussi les volumes.
 - **`"1433:1433"` ou `"127.0.0.1:1433:1433"` ?** Le premier expose le port à tout le réseau ; le second le limite à la machine. En développement, on n'expose que ce dont l'hôte a besoin.
+- **Comment servir une application Angular dans un conteneur ?** Build multi-stage : Node compile (`npm ci`, `ng build`), une image nginx non-root sert `dist/…/browser` avec un repli vers `index.html` pour les routes du client.
+- **Pourquoi pas de CORS en local avec le conteneur front ?** nginx relaie `/api` vers l'API : le navigateur ne voit qu'une origine. CORS ne s'applique qu'entre origines différentes (Azure : Static Web Apps → App Service).
+- **nginx renvoie 502 après avoir recréé le conteneur de l'API : pourquoi ?** nginx avait résolu `api` au démarrage ; la nouvelle IP n'est pas connue. Parade : `resolver 127.0.0.11` + variable dans `proxy_pass`.
+- **Comment vérifier qu'un conteneur ne tourne pas en root ?** `docker exec <conteneur> id` (ici `uid=101(nginx)`).

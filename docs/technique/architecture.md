@@ -1,7 +1,7 @@
 # Architecture — AAAS
 
 > Rédigé par l'agent `architecte`. Vue d'ensemble : couches, schéma de données, flux, déploiement. Les décisions détaillées (contexte, alternatives écartées) sont dans `docs/adr/`. Référence : `docs/cahier-des-charges.md` (v1.1).
-> Version 7 — 18/11/2026 — conception de l'étape 2 (événements côté admin, numéro de contact, consultation publique) : ADR 0009 à 0013, schéma `Events` et `AssociationSettings` précisé (`decimal(9,3)` sans objet `Money`, `Description nvarchar(4000)`, ligne unique créée par la migration), endpoints de l'étape 2, pagination `PagedResult<T>`, port `IEventLock` et service `EventOccupancyReader`, questions E2-1 à E2-13. Plan détaillé : [`plan-etape-2.md`](plan-etape-2.md). (Version 6 — 13/11/2026 — correction de la fuite par `QueryIterationFailed` : règle « EF Core ne journalise aucune exception SQL au-dessus de `Debug` », liste complète des événements EF traités, `ExecutionStrategyRetrying` laissé visible (choix assumé), point de décision ouvert sur les autres erreurs 500 et sur `/health/ready` (ADR 0002). (Version 5 — 13/11/2026 : alignement sur le code final de l'étape 1 : `BOOTSTRAP_ADMIN_EMAIL` et `BOOTSTRAP_ADMIN_PASSWORD` vides dans `.env.example` et obligatoires pour `docker compose` (`${VAR:?}`), `ApiExceptionHandler` qui renvoie toujours `true`, échec de démarrage relancé sans l'exception d'origine quand elle peut contenir un message SQL, image SQL Server épinglée, ports publiés sur `127.0.0.1`. Version 4 — 13/11/2026 : projet `tests/Aaas.Infrastructure.Tests`, journalisation des violations d'unicité, échecs de démarrage en `Critical`, promotion journalisée en `Warning`, course entre instances, adresse d'admin non publiée. Version 3 — 10/11/2026 : décisions du porteur, implémentation et revue de l'étape 1.)) À mettre à jour à chaque étape du MVP.
+> Version 8 — 23/11/2026 — front Angular de la semaine 2 réalisé (ADR 0014 à 0017 acceptés par le porteur) : § 6 réécrit d'après le code (structure, session restaurée **sans** appel `/me`, `rxResource`, Material), § 7 service `front` (nginx non-root 8080, healthcheck, relais `/api`), § 0 et § 1 mis à jour. (Version 7 — 18/11/2026 — conception de l'étape 2 (événements côté admin, numéro de contact, consultation publique) : ADR 0009 à 0013, schéma `Events` et `AssociationSettings` précisé (`decimal(9,3)` sans objet `Money`, `Description nvarchar(4000)`, ligne unique créée par la migration), endpoints de l'étape 2, pagination `PagedResult<T>`, port `IEventLock` et service `EventOccupancyReader`, questions E2-1 à E2-13. Plan détaillé : [`plan-etape-2.md`](plan-etape-2.md). (Version 6 — 13/11/2026 — correction de la fuite par `QueryIterationFailed` : règle « EF Core ne journalise aucune exception SQL au-dessus de `Debug` », liste complète des événements EF traités, `ExecutionStrategyRetrying` laissé visible (choix assumé), point de décision ouvert sur les autres erreurs 500 et sur `/health/ready` (ADR 0002). (Version 5 — 13/11/2026 : alignement sur le code final de l'étape 1 : `BOOTSTRAP_ADMIN_EMAIL` et `BOOTSTRAP_ADMIN_PASSWORD` vides dans `.env.example` et obligatoires pour `docker compose` (`${VAR:?}`), `ApiExceptionHandler` qui renvoie toujours `true`, échec de démarrage relancé sans l'exception d'origine quand elle peut contenir un message SQL, image SQL Server épinglée, ports publiés sur `127.0.0.1`. Version 4 — 13/11/2026 : projet `tests/Aaas.Infrastructure.Tests`, journalisation des violations d'unicité, échecs de démarrage en `Critical`, promotion journalisée en `Warning`, course entre instances, adresse d'admin non publiée. Version 3 — 10/11/2026 : décisions du porteur, implémentation et revue de l'étape 1.))) À mettre à jour à chaque étape du MVP.
 
 ## 0. État d'avancement
 
@@ -9,13 +9,14 @@
 |---|---|---|
 | 1. Comptes et premier admin | **Implémentée** | inscription, connexion, `GET /api/account/me`, rôles, premier admin, migration `InitialIdentity`, sondes `/health` et `/health/ready`, `docker compose` (sqlserver + api), quatre projets de tests |
 | 2. Événements côté admin (+ 3. consultation, regroupées) | **Implémentée** (19/11/2026), tests d'intégration complets et revue à faire | plan [`plan-etape-2.md`](plan-etape-2.md), ADR 0009 à 0013 ; migration `AddEventsAndAssociationSettings` ; ajouts v4 (cahier v1.2) : suppression d'un brouillon jamais publié (`FirstPublishedAt`), retrait du numéro de contact, `hasEnded` |
+| Front S2 (écrans des étapes 1 et 2) | **Implémenté** (23/11/2026), revue à faire | `front/` : Angular 22, inscription, connexion, mon compte, événements (liste, détail), admin (liste, formulaire, publication, numéro de contact), image Docker nginx, 165 tests Vitest ; ADR 0014 à 0017, plan [`plan-front-angular.md`](plan-front-angular.md) ; état détaillé : [`etat-avancement.md`](etat-avancement.md) |
 | 4 à 9 | à faire | — |
 
-Dans ce document, ce qui n'existe pas encore est signalé par *(étape N)* ou *(S2)*.
+Dans ce document, ce qui n'existe pas encore est signalé par *(étape N)* ou *(S3)*.
 
 ## 1. Décisions d'architecture (index)
 
-Tous les ADR sont au statut **Proposé** : le porteur n'a pas encore validé formellement les choix d'architecture (voir § 13 pour ce qui reste à trancher).
+Les ADR 0001 à 0013 sont au statut **Proposé** : le porteur n'a pas encore validé formellement ces choix (voir § 13). Les ADR 0014 à 0017 (front) sont **acceptés** (porteur, 23/11/2026).
 
 | ADR | Décision en une ligne |
 |---|---|
@@ -32,6 +33,10 @@ Tous les ADR sont au statut **Proposé** : le porteur n'a pas encore validé for
 | [0011](../adr/0011-listes-pagination-tri-et-filtres.md) | Pagination `page`/`pageSize` (≤ 50), enveloppe `PagedResult<T>`, tri serveur stable (`StartsAt`, `Id`), filtres admin `status`/`period`, décompte groupé des places (pas de N+1) |
 | [0012](../adr/0012-modification-d-un-evenement-verrou-version-et-avertissement.md) | Modification : `IEventLock` (`UPDLOCK` + stratégie d'exécution) **et** `version` ; avertissement `registrants_warning` en deux temps contrôlé par le serveur ; occupation passée au Domain (`EventOccupancy`) ; `EventOccupancyReader` renvoie zéro jusqu'à l'étape 4 |
 | [0013](../adr/0013-parametres-de-l-association-table-singleton.md) | Numéro de contact : table `AssociationSettings` à une ligne (`CHECK Id = 1`) créée par la migration ; lecture par tout connecté, écriture admin avec `version` ; avertissement non bloquant à la publication |
+| [0014](../adr/0014-front-angular-version-structure-et-conventions.md) | Front : Angular 22, standalone, signals, zoneless, `OnPush`, `rxResource` en lecture, reactive forms, Material 3, routes françaises chargées à la demande, admin en `canMatch`, Vitest, ESLint (**accepté**) |
+| [0015](../adr/0015-session-jwt-cote-front.md) | Session : `localStorage` `{ accessToken, localDeadline }`, JWT décodé sans appel `/me` au démarrage, échéance relative, intercepteur (Bearer vers `/api/` seulement, 401 → reconnexion), guards de confort, onglets synchronisés (**accepté**) |
+| [0016](../adr/0016-formulaires-erreurs-dates-et-version-cote-front.md) | Formulaires aux noms et messages de l'API, `toApiError` / `applyServerErrors` décidant sur `code`, dates de Tunis (`DatePipe` `+0100`, `toTunisIso`), `version` dans un signal et flux 409 (**accepté**) |
+| [0017](../adr/0017-conteneur-front-nginx-proxy-et-configuration-de-l-api.md) | Conteneur front : Node → nginx non-root 8080, repli SPA, relais `/api` (même origine, pas de CORS en local), CSP, healthcheck ; `proxy.conf.mjs` en développement (**accepté**) |
 
 ## 2. Vue d'ensemble
 
@@ -274,63 +279,91 @@ Précisions :
 
   **À vérifier** (§ 9) : quand `/health/ready` échoue, le service de health checks d'ASP.NET Core peut journaliser en Error l'exception de la vérification ; à constater avant S3.
 
-## 6. Front Angular (S2)
+## 6. Front Angular (S2, réalisé)
 
-Rappel des notions (le détail ira dans `docs/revision/angular.md`) :
-- **Composant standalone** : un composant qui déclare lui-même ses dépendances (`imports: [...]`), sans `NgModule`. Analogie .NET : une page Razor autonome.
-- **Signal** : une valeur réactive (`signal()`, dérivée avec `computed()`) ; le template se met à jour quand elle change. Analogie : une propriété avec `INotifyPropertyChanged`, sans la plomberie.
-- **Service `providedIn: 'root'`** : singleton injecté avec `inject()`. Analogie : `AddSingleton` + injection par constructeur.
-- **Interceptor HTTP fonctionnel** : fonction appelée pour chaque requête `HttpClient`. Analogie : un middleware ou un `DelegatingHandler`.
-- **Guard (`CanActivateFn`)** : fonction qui autorise ou non la navigation vers une route. C'est du **confort** (masquer des pages) : la sécurité réelle est vérifiée par l'API.
-- **Reactive forms typés** : le formulaire est un objet TypeScript (`FormGroup<{ email: FormControl<string> }>`) avec ses validateurs ; les erreurs 400 de l'API sont recopiées sur les champs (clés `errors` = noms des contrôles).
+Décisions : ADR 0014 à 0017 (acceptés). Plan : [`plan-front-angular.md`](plan-front-angular.md). Notions expliquées dans `docs/revision/angular.md` ; trajet complet dans `docs/revision/flux-ecran-api-base.md`.
 
-Organisation :
+Rappel des notions :
+- **Composant standalone** : déclare lui-même ses dépendances (`imports: [...]`), sans `NgModule`. Analogie : une page Razor autonome.
+- **Signal** : valeur réactive (`signal()`, `computed()`) ; en **zoneless** (défaut v21+) un template ne se met à jour que si un signal qu'il lit change, d'où la règle « tout état affiché est un signal ».
+- **Service `providedIn: 'root'`** : singleton injecté avec `inject()` (≈ `AddSingleton`).
+- **Intercepteur HTTP fonctionnel** : ≈ `DelegatingHandler`.
+- **Guard** : confort (masquer, rediriger) ; la sécurité réelle est l'API.
+- **Reactive forms typés** : contrôles nommés comme les clés JSON de l'API ; les erreurs 400 se recopient sur les champs.
+- **`rxResource`** : lecture réactive d'un `Observable` (`value()`, `isLoading()`, `error()`, `reload()`), relancée quand un paramètre (page, filtre, id) change.
+
+Versions : Angular 22.3, Angular Material 22.3 (M3), TypeScript 6.0, Node 24 (`front/.nvmrc`), Vitest 5.1, angular-eslint 22.8.
+
+Organisation (`front/src/app/`) :
 
 ```
-front/src/app/
-├─ core/            auth.service.ts (signals currentUser, isAdmin = computed(() => roles.includes('Admin'))),
-│                   auth.interceptor.ts, auth.guard.ts, admin.guard.ts, api-error.ts (lecture des ProblemDetails), tunis-time.ts
-├─ features/
-│  ├─ public/       actualités, événements (liste, détail), politique de confidentialité
-│  ├─ account/      inscription, connexion, mon compte
-│  ├─ reservations/ mes réservations
-│  └─ admin/        événements, demandes à traiter, inscrits, actualités, paramètres (lazy-loaded)
-└─ app.routes.ts
+├─ app.ts / app.html / app.config.ts / app.routes.ts    coquille, providers (≈ Program.cs), routes
+├─ core/                    singletons, aucun écran
+│  ├─ api/                  AuthApi, AccountApi, EventsApi, AdminEventsApi, SettingsApi (HttpClient → Observable)
+│  ├─ models/               api-models.ts : recopie des DTO d'api.md
+│  ├─ auth/                 AuthService (signals), jwt.ts, session-storage.ts, auth.interceptor.ts, auth.guards.ts, return-url.ts
+│  ├─ errors/               toApiError (ProblemDetails → { status, code, message, fieldErrors }), applyServerErrors
+│  ├─ time/                 tunis-time.ts (toTunisIso, toTunisLocalInput), date-formats.ts
+│  ├─ config/               app-info.ts (nom, logo, coordonnées : SEUL endroit à changer), locale, titres d'onglet, formatage
+│  └─ notifications/        NotificationService (message court, signal)
+├─ shared/                  forms/ (validateurs, messages, <app-field-errors>, garde de sortie), pipes/ (tndPrice),
+│                           events/ (mentions, statuts), ui/ (<app-pager>, dialogue de confirmation, chargement), phone.ts, ids.ts
+├─ layout/                  en-tête, pied de page, notifications, « Contenu introuvable », « Accès réservé »
+└─ features/
+   ├─ account/              register/, login/, my-account/
+   ├─ public/               event-list/, event-detail/, privacy/
+   └─ admin/                admin.routes.ts, admin-layout.ts, events/admin-event-list/, events/admin-event-form/,
+                            settings/contact-settings/
 ```
 
-Routes (en français) : `/`, `/actualites`, `/actualites/:id`, `/evenements`, `/evenements/:id`, `/inscription`, `/connexion`, `/mon-compte` (authGuard), `/mes-reservations` (authGuard), `/admin/...` (adminGuard, chargé à la demande avec `loadChildren` : `/admin/evenements`, `/admin/evenements/nouveau`, `/admin/evenements/:id`, `/admin/parametres`, puis demandes et actualités), `/confidentialite`, `**` → « Contenu introuvable ».
+Règles : `features/` dépend de `core/` et `shared/`, jamais l'inverse ; `core/` ne dépend pas de `shared/` ; aucun `HttpClient` dans un composant.
 
-Préparé par l'étape 2 (détail dans `plan-etape-2.md` § 13) : interfaces TypeScript recopiées des DTO (`PagedResult<T>`, événements, paramètres) ; pipe `tndPrice` (« Gratuit », « 15 TND, à régler sur place », « 12,500 TND, à régler sur place », ADR 0010) ; `toTunisIso()` pour le champ `datetime-local`, qui ne porte pas de fuseau (ADR 0003, 0009) ; lecture des `ProblemDetails` dans `api-error.ts` : erreurs 400 recopiées sur les contrôles, 409 `registrants_warning` → confirmation puis renvoi, 409 `concurrent_update` → rechargement de la fiche.
+Routes (en français, chaque page chargée à la demande) :
 
-Points du formulaire d'inscription découlant des décisions du porteur :
-- téléphone : champ prérempli ou préfixé par « +216 », validateur identique à RG-11 (« +216 » + 8 chiffres, espaces tolérés), message « par exemple +216 20 123 456 » ; pas de conversion d'une saisie locale ;
-- une seule case obligatoire « J'accepte la politique de confidentialité » (lien vers `/confidentialite`), **aucune case ni question d'âge** ;
-- le front n'envoie **pas** de version de politique : c'est le serveur qui l'enregistre.
+| Chemin | Écran | Accès |
+|---|---|---|
+| `/` | redirection vers `/evenements` (pas encore d'actualités) | tous |
+| `/evenements`, `/evenements/:id` | liste (`?page=`), détail | tous |
+| `/inscription`, `/connexion` | formulaires (`?returnUrl=`, `?raison=expiree`) | visiteur (`guestGuard`) |
+| `/mon-compte` | lecture du compte | connecté (`authGuard`) |
+| `/confidentialite` | politique (texte provisoire) | tous |
+| `/acces-refuse`, `**` | accès réservé, contenu introuvable | tous |
+| `/admin/evenements`, `/admin/evenements/nouveau`, `/admin/evenements/:id`, `/admin/parametres` | espace admin chargé par `loadChildren` | admin (`adminGuard` en `canMatch`) ; garde de sortie sur les formulaires |
 
-« Mon compte » (US-F3) affiche prénom, nom, e-mail, téléphone (formaté `+216 20 123 456`), date de création, date et version du consentement, à partir de `GET /api/account/me`.
+Plus tard : `/actualites`, `/actualites/:id`, `/mes-reservations` (`authGuard`), demandes et inscrits côté admin.
 
-Flux d'authentification :
+Session (ADR 0015) : au démarrage, `AuthService` relit `localStorage` `aaas.session = { accessToken, localDeadline }` et décode le JWT (prénom, rôles) **sans appel réseau** : les pages publiques ne dépendent jamais de l'API d'authentification. Une session révoquée est détectée au premier appel protégé (401 → déconnexion et page de connexion). « Mon compte » appelle `GET /api/account/me` à l'ouverture de la page seulement.
 
 ```mermaid
 sequenceDiagram
     participant U as Utilisateur
-    participant F as Front (AuthService + interceptor)
+    participant F as Front (AuthService + intercepteur)
+    participant N as nginx (conteneur front)
     participant A as API
     participant DB as Base
     U->>F: formulaire de connexion
-    F->>A: POST /api/auth/login
-    A->>DB: vérifie le mot de passe (compteur d'échecs, blocage)
-    A->>DB: UPDATE LastLoginAt (succès uniquement)
-    A-->>F: 200 { accessToken, expiresAt, user { ..., roles: [...] } }
-    F->>F: localStorage + signal currentUser
-    U->>F: navigue vers /mes-reservations (authGuard OK)
-    F->>A: GET ... (interceptor ajoute Authorization: Bearer)
+    F->>N: POST /api/auth/login
+    N->>A: relais vers api:8080
+    A->>DB: mot de passe (compteur d'échecs, blocage), UPDATE LastLoginAt
+    A-->>F: 200 { accessToken, expiresAt, user }
+    F->>F: décode le JWT, localStorage { accessToken, localDeadline }, signals, minuterie
+    U->>F: ouvre /mon-compte (authGuard : isLoggedIn())
+    F->>N: GET /api/account/me + Authorization: Bearer (intercepteur)
+    N->>A: relais
     A->>DB: security stamp toujours valide ?
-    A-->>F: 401 (jeton expiré, compte supprimé ou rôle modifié)
-    F->>F: efface le jeton, redirige vers /connexion?returnUrl=...
+    alt jeton valide
+        A-->>F: 200 AccountDto
+    else expiré, compte supprimé ou rôle modifié
+        A-->>F: 401
+        F->>F: efface la session, /connexion?returnUrl=/mon-compte&raison=expiree
+    end
 ```
 
-Au démarrage, `AuthService` relit le jeton dans `localStorage`, ignore un jeton expiré, puis appelle `GET /api/account/me` pour confirmer la session.
+Formulaires et erreurs (ADR 0016) : validation front de confort avec **les mêmes messages** que l'API (`shared/forms/validation-messages.ts`) ; décisions sur le `code` de l'API, jamais sur le texte ; `version` d'une fiche gardée dans un signal et remplacée après chaque réponse ; `concurrent_update` → dialogue « Recharger » / « Fermer » ; `registrants_warning` → confirmation puis renvoi avec `confirmRegistrantsWarning: true`.
+
+Points du formulaire d'inscription issus des décisions du porteur : téléphone prérempli « +216 », validateur identique à RG-11 ; une seule case « J'ai lu et j'accepte la politique de confidentialité » (lien vers `/confidentialite`), aucune question d'âge ; le front n'envoie pas de version de politique (le serveur l'enregistre). « Mon compte » affiche prénom, nom, e-mail, téléphone (`+216 20 123 456`), date de création, version et date du consentement, dernière connexion.
+
+Taille : bundle initial 423 Ko bruts / 107 Ko transférés (budget d'avertissement 500 Ko) ; l'espace admin et les formulaires sont dans des fichiers chargés à la demande.
 
 ## 7. Conteneurs (Docker)
 
@@ -350,9 +383,9 @@ Services :
 |---|---|---|---|---|
 | `sqlserver` | `mcr.microsoft.com/mssql/server:2022-CU27-GDR2-ubuntu-22.04` (tag épinglé, le même que les tests d'intégration ; 2025 si le type `VECTOR` est retenu pour le RAG) | `127.0.0.1:1433` → 1433 (poste local uniquement) | **oui** : `sqlcmd ... -Q "SELECT 1"` | volume `sqlserver-data`, `MSSQL_SA_PASSWORD` obligatoire (`:?`) |
 | `api` | construite depuis `src/Aaas.Api/Dockerfile` (SDK → runtime `aspnet`, utilisateur non-root `$APP_UID`) | `127.0.0.1:8080` → 8080 (poste local uniquement) | **non** (voir ci-dessous) | attend `sqlserver` `healthy` ; `Database__MigrateOnStartup=true` ; depuis `.env` : `Jwt__SigningKey`, `Bootstrap__AdminEmail` et `Bootstrap__AdminPassword` **obligatoires** (`:?`), `Bootstrap__AdminFirstName`/`LastName`/`Phone` facultatifs (`:-`), `Bootstrap__PromoteExistingAccount` (`false` par défaut) |
-| `front` *(S2)* | construite depuis `front/Dockerfile` (Node → nginx) | `127.0.0.1:4200` → 80 | à décider en S2 (nginx peut être sondé avec `wget`, présent dans l'image Alpine) | nginx sert les fichiers statiques, renvoie `index.html` pour les routes Angular, et relaie `/api` vers `api:8080` (pas de CORS en local) |
+| `front` | construite depuis `front/Dockerfile` (contexte `front/` : `node:24.22.3-alpine3.24` compile → `nginxinc/nginx-unprivileged:1.30.6-alpine3.24`, utilisateur non-root UID 101, environ 61 Mo) | `127.0.0.1:4200` → 8080 (poste local uniquement ; même port que `ng serve`, ne pas lancer les deux) | **oui** : `wget -q --spider http://127.0.0.1:8080/healthz` | `depends_on: api` simple ; nginx sert les fichiers statiques, renvoie `index.html` pour les routes Angular (repli SPA), relaie `/api` vers `api:8080` avec `resolver 127.0.0.11` (pas de CORS en local, API recréée sans 502 durable), pose la CSP et les en-têtes de sécurité (ADR 0017) |
 
-**Pourquoi pas de healthcheck sur `api`** : un healthcheck compose s'exécute dans le conteneur, et l'image `mcr.microsoft.com/dotnet/aspnet` ne contient ni `curl` ni `wget`. Les options (installer `curl`, ce qui grossit l'image et sa surface d'attaque ; embarquer un petit exécutable de sonde) n'apportent rien tant qu'aucun service ne dépend de l'API dans compose. La route `/health` existe et sert à App Service, qui sonde depuis l'extérieur. Conséquence pour S2 : le `front` utilisera `depends_on: api` simple (`service_started`) ; nginx renvoie 502 pendant les quelques secondes où l'API démarre, ce qui est acceptable en local.
+**Pourquoi pas de healthcheck sur `api`** : un healthcheck compose s'exécute dans le conteneur, et l'image `mcr.microsoft.com/dotnet/aspnet` ne contient ni `curl` ni `wget`. Les options (installer `curl`, ce qui grossit l'image et sa surface d'attaque ; embarquer un petit exécutable de sonde) n'apportent rien tant qu'aucun service ne dépend de l'API dans compose. La route `/health` existe et sert à App Service, qui sonde depuis l'extérieur. Conséquence : le `front` utilise `depends_on: api` simple (`service_started`) ; nginx renvoie 502 pendant les quelques secondes où l'API démarre, et le front affiche « Le service est momentanément indisponible. Réessayez dans un instant. » avec un bouton « Réessayer ».
 
 **Variables `.env` du premier admin** (modèle `.env.example`, ADR 0008) :
 - `BOOTSTRAP_ADMIN_EMAIL` et `BOOTSTRAP_ADMIN_PASSWORD` sont **vides** dans `.env.example`, et `docker-compose.yml` les rend **obligatoires** (`${BOOTSTRAP_ADMIN_EMAIL:?...}`, `${BOOTSTRAP_ADMIN_PASSWORD:?...}`) : `docker compose up` refuse de démarrer tant qu'elles ne sont pas renseignées. Pas d'e-mail par défaut : une adresse publiée pourrait être prise par un tiers via l'inscription et bloquer le démarrage. Une fois l'admin créé, ces valeurs ne sont plus lues, mais doivent rester renseignées pour compose.

@@ -6,6 +6,7 @@
 ## Conventions
 
 - Base : `http://localhost:8080` (docker compose) ou `http://localhost:5080` (`dotnet run`). Préfixe `/api`.
+- **Appels du front** : toujours en chemin relatif (`/api/...`, même origine). En local, nginx (conteneur `front`, `http://localhost:4200`) ou le serveur de développement Angular (`proxy.conf.mjs`) relaient vers l'API : pas de CORS. En Azure (S3), le front appellera l'URL d'App Service avec CORS (ADR 0017). Les interfaces TypeScript recopiées de ce document sont dans `front/src/app/core/models/api-models.ts` : **toute modification d'un DTO ici se reporte là-bas dans la même tâche**.
 - JSON en camelCase ; dates ISO 8601 en UTC avec décalage (`2026-11-10T19:39:20+00:00`).
 - Authentification : en-tête `Authorization: Bearer <accessToken>`. **Tout endpoint exige un jeton**, sauf ceux indiqués « anonyme ».
 - Erreurs au format `ProblemDetails` (RFC 9457), `Content-Type: application/problem+json` :
@@ -154,11 +155,11 @@ Mention à afficher (choisie par le front, dans cet ordre) : `status = "Cancelle
 | Code | Quand |
 |---|---|
 | 200 `EventDetailDto` | Événement publié ou annulé, **même terminé** (historique, RG-14 ; `hasEnded: true`). |
-| 404 `not_found` | Brouillon, identifiant inconnu ou mal formé (« Contenu introuvable. », même réponse dans les trois cas). |
+| 404 `not_found` | Brouillon, identifiant inconnu ou mal formé (« Contenu introuvable. », même réponse dans les trois cas, visiteur ou connecté). Un identifiant qui n'est pas un GUID (`/api/events/abc`) est servi par une route de repli `GET /api/events/{id}` sans contrainte, anonyme, qui ne fait que renvoyer ce 404 (`EventsController.GetMalformedId`, absente d'OpenAPI) ; sans elle, aucun endpoint ne correspondait et la politique « authentifié par défaut » répondait 401 au visiteur (écart D1, corrigé le 23/11/2026). Les autres verbes sur ce chemin restent refusés au visiteur (401). |
 
 ## Événements — administration (US-E2)
 
-Toutes les routes `/api/admin/...` exigent le rôle **Admin** : sans jeton → 401 `unauthorized` ; membre → 403 `forbidden`. Un identifiant mal formé dans l'URL → 404.
+Toutes les routes `/api/admin/...` exigent le rôle **Admin** : sans jeton → 401 `unauthorized` ; membre → 403 `forbidden`. Un identifiant mal formé dans l'URL (`/api/admin/events/abc`, `.../abc/publish`, `.../abc/unpublish`, en GET/PUT/DELETE/POST selon la route) suit le même contrôle de rôle : visiteur 401, membre 403, admin **404 `not_found`** (« Événement introuvable. »). Ces chemins sont servis par `AdminEventsController.MalformedId` (soumis à `AdminOnly`) : sans elle, un membre connecté recevait 404 au lieu de 403.
 
 **`AdminEventSummaryDto`** (ligne de liste) : `id`, `title`, `location`, `startsAt`, `endsAt`, `status` (`Draft`, `Published`, `Cancelled`), `capacity`, `price`, `pendingCount`, `confirmedCount` (0 jusqu'à l'étape 4), `remainingSeats`, `hasStarted`, `hasEnded`, `canBeDeleted`.
 

@@ -13,11 +13,11 @@ export interface ApiError {
   fieldErrors: Record<string, string[]>;
 }
 
-export const NETWORK_ERROR_MESSAGE =
-  'Impossible de joindre le serveur. Vérifiez votre connexion puis réessayez.';
+// Textes : docs/fonctionnel/libelles-ecrans.md § 1 et § 7.
+export const NETWORK_ERROR_MESSAGE = 'Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.';
 export const UNAVAILABLE_MESSAGE = 'Le service est momentanément indisponible. Réessayez dans un instant.';
-export const GENERIC_ERROR_MESSAGE = 'Une erreur est survenue.';
-export const FORBIDDEN_MESSAGE = 'Accès réservé aux administrateurs.';
+export const GENERIC_ERROR_MESSAGE = 'Un problème est survenu. Veuillez réessayer plus tard.';
+export const FORBIDDEN_MESSAGE = "Vous n'avez pas le droit d'effectuer cette action.";
 
 /**
  * Transforme n'importe quelle erreur reçue (HttpErrorResponse, ou erreur d'un rxResource qui l'enveloppe

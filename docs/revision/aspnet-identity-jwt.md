@@ -82,6 +82,7 @@ Un JWT est valable jusqu'à `exp` : le serveur ne peut pas « l'oublier ». Para
 - `[Authorize]` : connecté ; `[Authorize(Policy = "AdminOnly")]` : politique `RequireRole("Admin")`.
 - **Politique de repli** (`SetFallbackPolicy(RequireAuthenticatedUser)`) : tout endpoint sans attribut exige un jeton. On ouvre explicitement avec `[AllowAnonymous]` / `.AllowAnonymous()` (auth, `/health`). « Sécurisé par défaut » : oublier un attribut ferme l'accès au lieu de l'ouvrir.
 - 401 = qui es-tu ? (pas ou mauvais jeton). 403 = je sais qui tu es, mais tu n'as pas le droit.
+- **Piège : la politique de repli s'applique aussi quand aucun endpoint ne correspond.** `/api/events/abc` ne passe pas la contrainte `{id:guid}` → pas d'endpoint → `AuthorizationMiddleware` applique le repli → 401 pour un visiteur au lieu de 404 ; un membre connecté passe le repli et reçoit le 404 générique, même sur `/api/admin/events/abc` (il apprend quelque chose avant d'être refusé). Correction dans le projet (écart D1) : une action de repli `{id}` **sans contrainte** dans chaque contrôleur, qui hérite de ses attributs (`[AllowAnonymous]` côté public, `AdminOnly` côté admin) et lève `NotFoundException`. Précédence des routes : un segment contraint (`{id:guid}`) passe avant un segment libre (`{id}`), donc un GUID valide va toujours à la vraie action.
 
 ## 3. Configuration et secrets
 

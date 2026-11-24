@@ -1,0 +1,51 @@
+<section class="page page--narrow">
+  <h1>Numéro de contact de l'association</h1>
+  <p class="muted">Ce numéro est affiché aux membres connectés pour valider leur demande de place.</p>
+
+  @if (loading()) {
+    <app-loading />
+  } @else if (loadError(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="load()">Réessayer</button>
+    </div>
+  } @else if (settings(); as s) {
+    <h2>Numéro actuel</h2>
+    @if (s.isConfigured && s.phoneNumber) {
+      <p>
+        <a [href]="telLink(s.phoneNumber)">{{ formatPhone(s.phoneNumber) }}</a>
+        @if (s.whatsApp) {
+          — <a [href]="whatsAppLink(s.phoneNumber)" target="_blank" rel="noopener">WhatsApp</a>
+        }
+      </p>
+      @if (s.updatedAt) {
+        <p class="muted">Modifié le {{ s.updatedAt | date: detailFormat }}</p>
+      }
+    } @else {
+      <p class="banner banner--warning">Aucun numéro n'est défini pour le moment.</p>
+    }
+
+    @if (errorMessage(); as message) {
+      <p class="banner banner--error" role="alert">{{ message }}</p>
+    }
+
+    <h2>{{ s.isConfigured ? 'Changer le numéro' : 'Définir le numéro' }}</h2>
+    <form class="form-grid" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <mat-form-field>
+        <mat-label>Numéro (+216 …)</mat-label>
+        <input matInput formControlName="phoneNumber" type="tel" inputmode="tel" />
+        <mat-hint>Mobile ou fixe, par exemple +216 71 123 456</mat-hint>
+        <mat-error><app-field-errors [control]="form.controls.phoneNumber" field="phoneNumber" /></mat-error>
+      </mat-form-field>
+
+      <mat-checkbox formControlName="whatsApp">Ce numéro est aussi sur WhatsApp</mat-checkbox>
+
+      <div class="actions">
+        <button mat-flat-button type="submit" [disabled]="busy()">Enregistrer</button>
+        @if (s.isConfigured) {
+          <button mat-stroked-button type="button" [disabled]="busy()" (click)="remove()">Retirer le numéro</button>
+        }
+      </div>
+    </form>
+  }
+</section>

@@ -1,0 +1,30 @@
+<section class="page page--narrow">
+  <h1>Se connecter</h1>
+
+  @if (expiredMessage(); as message) {
+    <p class="banner banner--info" role="status">{{ message }}</p>
+  }
+  @if (errorMessage(); as message) {
+    <p class="banner banner--error" role="alert">{{ message }}</p>
+  }
+
+  <!-- [formGroup] relie la balise <form> à l'objet FormGroup du composant ; (ngSubmit) = envoi (Entrée ou bouton). -->
+  <form class="form-grid" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <mat-form-field>
+      <mat-label>Adresse e-mail</mat-label>
+      <input matInput formControlName="email" type="email" autocomplete="email" />
+      <mat-error><app-field-errors [control]="form.controls.email" field="email" /></mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Mot de passe</mat-label>
+      <input matInput formControlName="password" type="password" autocomplete="current-password" />
+      <mat-error><app-field-errors [control]="form.controls.password" field="password" /></mat-error>
+    </mat-form-field>
+
+    <div class="actions">
+      <button mat-flat-button type="submit" [disabled]="submitting()">Se connecter</button>
+      <a routerLink="/inscription" [queryParams]="registerQueryParams()">Pas encore de compte ? Créer un compte</a>
+    </div>
+  </form>
+</section>

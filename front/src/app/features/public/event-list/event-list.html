@@ -1,0 +1,58 @@
+<section class="page">
+  <h1>Événements à venir</h1>
+
+  @if (errorMessage(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="events.reload()">Réessayer</button>
+    </div>
+  } @else if (events.isLoading()) {
+    <app-loading />
+  } @else if (events.value(); as result) {
+    @if (result.items.length === 0 && result.totalCount === 0) {
+      <p class="muted">Aucun événement prévu pour le moment.</p>
+    } @else if (result.items.length === 0) {
+      <!-- Page au-delà de la dernière (lien ancien, ou événements terminés entre-temps). -->
+      <p>Cette page ne contient plus d'événement. <a routerLink="/evenements">Revenir à la première page</a></p>
+    } @else {
+      <ul class="cards">
+        <!-- track : identifiant stable de chaque élément, pour ne recréer que les cartes qui changent. -->
+        @for (event of result.items; track event.id) {
+          @let m = mention(event);
+          <li>
+            <mat-card appearance="outlined" class="card">
+              <mat-card-header>
+                <mat-card-title>
+                  <h2 class="card__title">{{ event.title }}</h2>
+                </mat-card-title>
+                <mat-card-subtitle>{{ event.startsAt | date: dateFormat }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <p>{{ event.location }}</p>
+                <p>{{ event.price | tndPrice }}</p>
+                <span
+                  class="chip"
+                  [class.chip--closed]="m.kind === 'ended' || m.kind === 'closed' || m.kind === 'full'"
+                  [class.chip--danger]="m.kind === 'cancelled'"
+                  >{{ m.label }}</span
+                >
+              </mat-card-content>
+              <mat-card-actions>
+                <a mat-button [routerLink]="['/evenements', event.id]">
+                  Voir le détail<span class="visually-hidden"> : {{ event.title }}</span>
+                </a>
+              </mat-card-actions>
+            </mat-card>
+          </li>
+        }
+      </ul>
+    }
+
+    <app-pager
+      [page]="result.page"
+      [pageSize]="pageSize"
+      [totalCount]="result.totalCount"
+      (pageChange)="goToPage($event)"
+    />
+  }
+</section>

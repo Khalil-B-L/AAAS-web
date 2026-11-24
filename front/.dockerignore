@@ -1,0 +1,16 @@
+# Exclu du CONTEXTE de build (ce que « docker build » envoie au démon) :
+# plus rapide, et aucun binaire Windows de node_modules copié dans une image Linux par « COPY . . ».
+node_modules/
+dist/
+.angular/
+coverage/
+out-tsc/
+.vscode/
+.idea/
+*.log
+# Scripts de contrôle de bout en bout et documentation : inutiles au build, et les exclure évite
+# qu'une simple retouche invalide la couche « COPY . . » (et donc le cache de « ng build »).
+e2e/
+*.md
+Dockerfile
+.dockerignore

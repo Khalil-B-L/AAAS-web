@@ -1,7 +1,7 @@
 # ADR 0014 — Front Angular : version, structure et conventions
 
-- **Statut** : Proposé (à valider par le porteur)
-- **Date** : 20/11/2026
+- **Statut** : Accepté (porteur, 23/11/2026) — valeurs par défaut validées (Angular 22, Material, zoneless, pas d'e2e outillé, ESLint)
+- **Date** : 20/11/2026 ; mise en œuvre le 23/11/2026 (Angular 22.3.0, Material 22.3, TypeScript 6.0, Vitest 5.1, angular-eslint 22.8)
 - **Mise en œuvre** : semaine 2 (front), tâche T0 du plan [`plan-front-angular.md`](../technique/plan-front-angular.md)
 - **Références** : cahier § 6.1, § 7 (front Angular récent, standalone, signals) ; architecture § 6 ; ADR 0003, 0011 ; ADR 0015 à 0017
 
@@ -45,6 +45,12 @@ Le cahier impose un « Angular récent » avec composants standalone et signals.
 - Material ajoute environ 100 à 200 Ko au bundle initial ; acceptable (objectif « < 2 s », cahier § 6.3), à mesurer avec `ng build` (budgets du CLI).
 - Montée de version : `ng update` une fois par an (v23 en juin 2027).
 
-## Reste à valider par le porteur
+## Validation et mise en œuvre
 
-- Material ou CSS maison (UX-1) ; tests de bout en bout ou non (Q-T1).
+- Le porteur a validé les valeurs par défaut le 23/11/2026 : Material (UX-1), pas de suite e2e outillée au MVP (Q-T1), ESLint (Q-T2).
+- Écarts assumés lors de la réalisation (aucun ne change la décision) :
+  - **Bundle initial** : les jetons et services Material lourds restent hors de `app.config.ts`. `MAT_FORM_FIELD_DEFAULT_OPTIONS` y faisait entrer form-field et `@angular/forms` (+115 Ko) : il est fourni par chaque écran à formulaire (`shared/forms/form-field-defaults.ts`). `MatSnackBar` (couche overlay) est remplacé par un petit `NotificationService` à base de signal ; `mat-toolbar` par un `<header>` en CSS. Résultat : 423 Ko bruts / 107 Ko transférés (budget 500 Ko).
+  - **Modèles** : un seul fichier `core/models/api-models.ts` au lieu d'un fichier par DTO (lecture plus simple pour 15 interfaces).
+  - **Polices** : polices du système (`system-ui`…) plutôt qu'une police hébergée : aucune requête externe, CSP respectée, rien à télécharger.
+  - **Lecture d'une fiche modifiable** (formulaire admin, numéro de contact) : chargement explicite (`load()`) plutôt que `rxResource`, car le formulaire est l'état et doit être remplacé après chaque réponse ; les listes et détails utilisent `rxResource`.
+  - **Contrôle navigateur** : `front/e2e/parcours-navigateur.mjs` (CDP, sans dépendance) pour vérifier les parcours sur une pile jetable ; ce n'est pas une suite e2e outillée.

@@ -1,4 +1,5 @@
 using Aaas.Application.Common;
+using Aaas.Application.Common.Errors;
 using Aaas.Application.Events;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,10 +22,18 @@ public sealed class EventsController(PublicEventService events) : ControllerBase
     public Task<PagedResult<EventSummaryDto>> List([FromQuery] PublicEventListQuery query, CancellationToken cancellationToken) =>
         events.ListAsync(query, cancellationToken);
 
-    /// <summary>{id:guid} : un identifiant mal formé donne 404, comme un identifiant inconnu.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType<EventDetailDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public Task<EventDetailDto> Get(Guid id, CancellationToken cancellationToken) =>
         events.GetAsync(id, cancellationToken);
+
+    /// <summary>
+    /// Identifiant mal formé (« /api/events/abc ») : même 404 qu'un identifiant inconnu. Sans cette route, aucun
+    /// endpoint ne correspond, la politique de repli (« authentifié par défaut ») s'applique et un visiteur reçoit 401.
+    /// « {id} » sans contrainte a une précédence plus faible que « {id:guid} » : un GUID valide va toujours à Get.
+    /// </summary>
+    [HttpGet("{id}")]
+    [ApiExplorerSettings(IgnoreApi = true)]
+    public void GetMalformedId() => throw new NotFoundException(PublicEventService.NotFoundMessage);
 }

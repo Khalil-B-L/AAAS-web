@@ -1,0 +1,48 @@
+.page--wide {
+  max-width: 72rem;
+}
+
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+
+  h1 {
+    margin: 0;
+  }
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.small {
+  font: var(--mat-sys-body-small);
+}
+
+.chip + .chip {
+  margin-left: 0.25rem;
+}

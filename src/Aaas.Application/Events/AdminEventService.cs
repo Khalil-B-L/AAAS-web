@@ -16,7 +16,7 @@ public sealed class AdminEventService(
     SettingsService settings,
     TimeProvider time)
 {
-    internal const string NotFoundMessage = "Événement introuvable.";
+    public const string NotFoundMessage = "Événement introuvable.";
     internal const string ContactNotConfiguredMessage =
         "Aucun numéro de contact n'est configuré : les membres ne sauront pas qui appeler pour faire confirmer leur demande.";
 

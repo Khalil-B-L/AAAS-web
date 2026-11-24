@@ -1,0 +1,31 @@
+<section class="page page--narrow">
+  <h1>Mon compte</h1>
+
+  @if (errorMessage(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="account.reload()">Réessayer</button>
+    </div>
+  } @else if (account.isLoading()) {
+    <app-loading />
+  } @else if (account.value(); as me) {
+    <dl class="details">
+      <dt>Prénom</dt>
+      <dd>{{ me.firstName }}</dd>
+      <dt>Nom</dt>
+      <dd>{{ me.lastName }}</dd>
+      <dt>Adresse e-mail</dt>
+      <dd>{{ me.email }}</dd>
+      <dt>Téléphone</dt>
+      <dd>{{ formatPhone(me.phoneNumber) }}</dd>
+      <dt>Compte créé le</dt>
+      <dd>{{ me.createdAt | date: dayFormat }}</dd>
+      <dt>Politique de confidentialité</dt>
+      <dd>version {{ me.privacyPolicyVersion }}, acceptée le {{ me.privacyConsentAt | date: dayFormat }}</dd>
+      @if (me.lastLoginAt) {
+        <dt>Dernière connexion</dt>
+        <dd>{{ me.lastLoginAt | date: detailFormat }}</dd>
+      }
+    </dl>
+  }
+</section>

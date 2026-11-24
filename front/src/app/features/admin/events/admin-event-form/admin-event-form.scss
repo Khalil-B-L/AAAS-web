@@ -1,0 +1,20 @@
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.small {
+  font: var(--mat-sys-body-small);
+}
+
+.state-actions {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+.danger {
+  --mat-button-outlined-label-text-color: var(--mat-sys-error);
+}

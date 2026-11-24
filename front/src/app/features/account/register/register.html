@@ -1,0 +1,59 @@
+<section class="page page--narrow">
+  <h1>Créer un compte</h1>
+
+  @if (errorMessage(); as message) {
+    <p class="banner banner--error" role="alert">{{ message }}</p>
+  }
+
+  <form class="form-grid" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="form-row">
+      <mat-form-field>
+        <mat-label>Prénom (obligatoire)</mat-label>
+        <input matInput formControlName="firstName" autocomplete="given-name" />
+        <mat-error><app-field-errors [control]="form.controls.firstName" field="firstName" /></mat-error>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>Nom (obligatoire)</mat-label>
+        <input matInput formControlName="lastName" autocomplete="family-name" />
+        <mat-error><app-field-errors [control]="form.controls.lastName" field="lastName" /></mat-error>
+      </mat-form-field>
+    </div>
+
+    <mat-form-field>
+      <mat-label>Adresse e-mail (obligatoire)</mat-label>
+      <input matInput formControlName="email" type="email" autocomplete="email" />
+      <mat-error><app-field-errors [control]="form.controls.email" field="email" /></mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Téléphone (obligatoire)</mat-label>
+      <input matInput formControlName="phoneNumber" type="tel" inputmode="tel" autocomplete="tel" />
+      <mat-hint>Au format +216 20 123 456</mat-hint>
+      <mat-error><app-field-errors [control]="form.controls.phoneNumber" field="phoneNumber" /></mat-error>
+    </mat-form-field>
+
+    <mat-form-field>
+      <mat-label>Mot de passe (obligatoire)</mat-label>
+      <input matInput formControlName="password" type="password" autocomplete="new-password" />
+      <mat-hint>Au moins 8 caractères, avec une lettre et un chiffre</mat-hint>
+      <mat-error><app-field-errors [control]="form.controls.password" field="password" /></mat-error>
+    </mat-form-field>
+
+    <div class="consent">
+      <mat-checkbox formControlName="acceptPrivacyPolicy">
+        J'ai lu et j'accepte la
+        <a routerLink="/confidentialite" target="_blank" rel="noopener">politique de confidentialité</a>
+        (s'ouvre dans un nouvel onglet)
+      </mat-checkbox>
+      <p class="consent__error" role="alert">
+        <app-field-errors [control]="form.controls.acceptPrivacyPolicy" field="acceptPrivacyPolicy" />
+      </p>
+    </div>
+
+    <div class="actions">
+      <button mat-flat-button type="submit" [disabled]="submitting()">Créer mon compte</button>
+      <a routerLink="/connexion" [queryParams]="loginQueryParams()">Déjà un compte ? Se connecter</a>
+    </div>
+  </form>
+</section>

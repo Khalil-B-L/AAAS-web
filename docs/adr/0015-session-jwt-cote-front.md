@@ -1,6 +1,6 @@
 # ADR 0015 — Session côté front : jeton JWT, intercepteur, guards, expiration
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 23/11/2026) — abandon de `/me` au démarrage et UX-5 (pas d'avertissement avant échéance) validés
 - **Date** : 20/11/2026
 - **Mise en œuvre** : semaine 2, tâche T3 du plan [`plan-front-angular.md`](../technique/plan-front-angular.md)
 - **Références** : ADR 0002 (JWT HS256 60 min sans refresh, `localStorage`, claims `sub`, `given_name`, `role`, `sst`) ; mvp US-A2, US-A3 (« Session expirée ») ; architecture § 6 ; cahier § 6.2
@@ -51,6 +51,12 @@ L'architecture (§ 6, version 7) prévoyait un appel `GET /api/account/me` au d�
 - Atténuation XSS (le risque principal de `localStorage`, ADR 0002) : aucun `innerHTML` contourné (`bypassSecurityTrust*` interdit), Content-Security-Policy servie par nginx (ADR 0017) puis par Static Web Apps (S3).
 - **Architecture § 6 à mettre à jour** : supprimer « appelle `GET /api/account/me` pour confirmer la session » au démarrage.
 
-## Reste à valider par le porteur
+## Validation et mise en œuvre
 
-- Abandon de l'appel `/me` au démarrage ; comportement à l'expiration pendant une saisie (UX-5).
+- Validé par le porteur le 23/11/2026 (valeurs par défaut).
+- Code : `front/src/app/core/auth/` (`auth.service.ts`, `jwt.ts`, `session-storage.ts`, `auth.interceptor.ts`, `auth.guards.ts`, `return-url.ts`) ; tests `*.spec.ts` du même dossier.
+- Précisions de mise en œuvre :
+  - à l'échéance de la minuterie, la redirection vers `/connexion?returnUrl=…&raison=expiree` n'a lieu que si la page courante est réservée (`/mon-compte`, `/admin…`) ; sur une page publique, simple message « Votre session a expiré. Veuillez vous reconnecter. » (texte de `libelles-ecrans.md`). Un 401 d'une requête authentifiée redirige toujours ;
+  - `accessToken()` vérifie aussi l'échéance au moment de l'envoi (cas d'un poste sorti de veille avant que la minuterie ne se déclenche) ;
+  - `returnUrl` refuse aussi `/\…` et les pages `/connexion` et `/inscription` (boucle).
+- Vérifié de bout en bout (23/11/2026) : un navigateur qui gardait un jeton signé par une **autre** installation restaure la session, l'API répond 401, l'intercepteur ferme la session et renvoie à la connexion.

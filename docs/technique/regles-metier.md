@@ -2,7 +2,7 @@
 
 > Tenu par l'agent `expert-technique`. Pour chaque règle : ce qui est appliqué, et **où** dans le code.
 > Références : `docs/cahier-des-charges.md` (RG-xx), `docs/fonctionnel/mvp.md` (R-xx, US-xx), `docs/adr/`.
-> État : **étape 2** (comptes ; événements côté admin et consultation publique ; numéro de contact). Les règles des réservations et des actualités seront ajoutées aux étapes suivantes.
+> État : **étape 2 + front S2** (comptes ; événements côté admin et consultation publique ; numéro de contact ; écrans correspondants). Les règles des réservations et des actualités seront ajoutées aux étapes suivantes. Ce que le front reprend ou affiche : § 6.
 
 ## 1. Comptes et authentification
 
@@ -177,3 +177,33 @@ Liste admin : tous statuts ; filtre `status` ; `period` = à venir (non terminé
 | `contact_not_configured` | — | **Avertissement** (pas une erreur), dans `warnings` de la réponse 200 de publication |
 
 Liste de référence : `src/Aaas.Domain/Common/ErrorCodes.cs`. Un code existant ne doit jamais être renommé (le front s'appuie dessus).
+
+## 6. Côté front : règles reprises à titre de confort et affichage
+
+Le serveur reste la seule référence : le front **reprend** certaines règles pour prévenir l'utilisateur avant l'envoi, avec **les mêmes messages**, et **affiche** les états calculés par l'API sans jamais les recalculer avec l'horloge du poste (ADR 0016). Chemins relatifs à `front/src/app/`.
+
+| Règle | Comportement du front | Où |
+|---|---|---|
+| Champs du compte (US-A1, R20) | obligatoires, longueurs 100 / 256 / 8-128, e-mail ; messages identiques à l'API | `features/account/register/`, `shared/forms/validators.ts`, `shared/forms/validation-messages.ts` |
+| Téléphone RG-11 | « +216 » prérempli ; refus avant envoi de tout ce qui n'est pas `+216` + 8 chiffres latins (espaces tolérés) ; même message que l'API | `tunisianPhone` (`shared/forms/validators.ts`) |
+| Mot de passe R21 | au moins une lettre (accents compris) et un chiffre, aide affichée sous le champ | `passwordStrength` |
+| Consentement | case obligatoire, lien vers `/confidentialite` (texte provisoire 1.0) ; le front n'envoie pas de version | `register.html`, `features/public/privacy/` |
+| Connexion R21 | `invalid_credentials` / `account_locked` : bandeau avec le message de l'API (durée de blocage comprise), mot de passe vidé | `features/account/login/login.ts` |
+| Session (US-A3) | déconnexion locale ; expiration à l'échéance du jeton − 60 s ; 401 d'une requête authentifiée → reconnexion avec retour à la page | `core/auth/auth.service.ts`, `core/auth/auth.interceptor.ts` |
+| Déconnexion depuis un formulaire modifié | le front navigue **d'abord** vers `/evenements` ; si l'utilisateur choisit « Rester » dans « Quitter sans enregistrer ? », il reste connecté et sa saisie est conservée ; la session n'est effacée qu'une fois la page quittée (ou si la navigation échoue techniquement) | `AuthService.logout()` |
+| Plusieurs onglets | déconnexion dans un autre onglet → page réservée quittée (connexion) ; **connexion avec un autre compte** dans un autre onglet (identifiant `sub` différent) → rechargement complet de la page, puis message « Vous êtes maintenant connecté avec un autre compte (depuis un autre onglet). La page a été rechargée. » ; même compte reconnecté → rien | `AuthService.onSessionChangedElsewhere()`, `core/browser/page-reload.ts`, `NotificationService.showAfterReload()` |
+| Accessibilité : focus | lien « Aller au contenu » (premier Tab) → focus sur la zone principale, sans recharger la page ; à chaque changement de page, focus sur le titre `<h1>` de la nouvelle page (à défaut la zone principale), pas au premier affichage ni quand seuls les paramètres changent (`?page=`, filtres) | `app.ts`, `app.html` |
+| Événement : valeurs (RG-13, R28, R29, RG-08) | titre et lieu ≤ 200, description ≤ 4 000 (compteurs), capacité entière 1 à 10 000, prix ≥ 0, ≤ 99 999,999, ≤ 3 décimales (virgule acceptée), fin après début. « Dans le futur » est laissé au serveur | `features/admin/events/admin-event-form/`, `shared/forms/validators.ts` |
+| Dates (ADR 0003) | saisie et affichage à l'heure de Tunis (`+01:00`), quel que soit le fuseau du poste ; libellés « (heure de Tunis) » | `core/time/tunis-time.ts`, `core/config/formatting.providers.ts` |
+| Prix (ADR 0010) | « Gratuit » ; « 15 TND, à régler sur place » ; « 12,500 TND, à régler sur place » | `shared/pipes/tnd-price.pipe.ts` |
+| Mention publique (§ 3.4) | Annulé > Terminé > Réservations closes > Complet > « N places restantes » / « 1 place restante », d'après `status`, `hasEnded`, `hasStarted`, `isFull` | `shared/events/event-labels.ts` |
+| Statut admin | « Brouillon », « Publié », « Annulé », complété par « En cours » ou « Terminé » | `adminStatusLabels` (même fichier) |
+| Actions admin (§ 3.1) | « Publier » si brouillon non commencé ; « Dépublier » si publié ; « Supprimer ce brouillon » seulement si `canBeDeleted` ; actions **désactivées tant que le formulaire a des modifications non enregistrées** (UX-7) ; fiche en lecture seule si annulé ou terminé | `admin-event-form.ts` / `.html` |
+| Concurrence (ADR 0006) | `version` remplacée après chaque réponse ; `concurrent_update` → « Recharger » / « Fermer » ; `registrants_warning` → confirmation puis renvoi avec `confirmRegistrantsWarning: true` | `admin-event-form.ts`, `features/admin/settings/contact-settings/` |
+| Codes « état changé » (`event_cancelled`, `event_ended`, `event_started`, `event_state_changed`, `event_already_published`, `event_has_active_reservations`) | message de l'API puis rechargement de la fiche | `admin-event-form.ts` (`STATE_CHANGED_CODES`) |
+| Avertissement `contact_not_configured` | bandeau persistant après publication, avec lien « Configurer le numéro de contact » | `admin-event-form.html` |
+| Numéro de contact (US-E8) | case WhatsApp désactivée sans numéro ; retrait après confirmation (`DELETE` avec `{ version }`) ; aperçu `tel:` et `wa.me` | `contact-settings.ts` |
+| Visibilité (RG-14) | brouillon ou identifiant inconnu → « Contenu introuvable » à la même adresse ; identifiant qui n'est pas un GUID → même page, sans appel à l'API ; idem pour la fiche admin `/admin/evenements/:id` | `features/public/event-detail/`, `admin-event-form.ts`, `shared/ids.ts` |
+| Bouton « Demander une place » (US-C2) | affiché pour un **visiteur** si l'événement est réservable, mène à `/connexion?returnUrl=/evenements/{id}` ; masqué pour un membre connecté tant que l'étape 4 n'existe pas (UX-9) | `event-detail.html` |
+| Accès admin | menu « Administration » si le jeton porte le rôle `Admin` ; un membre sur `/admin…` voit « Accès réservé » (le code admin n'est pas téléchargé, `canMatch`) | `layout/header.html`, `core/auth/auth.guards.ts` |
+| Quitter un formulaire modifié (UX-8) | confirmation « Quitter sans enregistrer ? » (navigation interne) et alerte du navigateur (fermeture de l'onglet) | `shared/forms/unsaved-changes.guard.ts`, `host` des formulaires admin |

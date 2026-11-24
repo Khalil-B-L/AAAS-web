@@ -1,4 +1,5 @@
 # Lancement local : copier .env.example en .env, le compléter, puis « docker compose up --build ».
+# Ouvrir ensuite http://localhost:4200 (front ; /api y est relayé vers l'API par nginx).
 # Le nom du projet préfixe les conteneurs, le réseau et les volumes (aaas-sqlserver-1, aaas_sqlserver-data...).
 name: aaas
 
@@ -59,6 +60,26 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     # Pas de healthcheck ici : l'image aspnet ne contient ni curl ni wget (voir docs/revision/docker.md).
+
+  front:
+    # Contexte = front/ (son propre .dockerignore) ; Node compile, nginx non-root sert les fichiers (ADR 0017).
+    build:
+      context: ./front
+    image: aaas-front:local
+    depends_on:
+      # Simple ordre de démarrage : l'API n'a pas de healthcheck. Pendant ses quelques secondes de démarrage,
+      # nginx répond 502 sur /api et le front affiche « Le service est momentanément indisponible ».
+      - api
+    ports:
+      # Même port que « ng serve » : ne pas lancer les deux en même temps (UX-11).
+      - "127.0.0.1:4200:8080"
+    healthcheck:
+      # BusyBox (wget) est présent dans l'image Alpine ; /healthz répond sans appeler l'API.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
 volumes:
   sqlserver-data:

@@ -52,6 +52,12 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+// Titre qui reçoit le focus après une navigation (app.ts) : point de départ du lecteur d'écran, pas un élément
+// interactif, donc pas de cadre de focus.
+h1[tabindex='-1']:focus {
+  outline: none;
+}
+
 // Classes utilitaires partagées par les écrans.
 .page {
   max-width: 60rem;

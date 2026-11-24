@@ -1,6 +1,7 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
+import { PAGE_RELOAD } from '../browser/page-reload';
+import { NotificationService } from '../notifications/notification.service';
 import { decodeJwtPayload, normalizeRoles, tokenLifetimeMs } from './jwt';
 import { DEFAULT_AFTER_LOGIN } from './return-url';
 import {
@@ -19,7 +20,9 @@ export interface Session {
   roles: string[];
 }
 
-export const SESSION_EXPIRED_MESSAGE = 'Votre session a expiré. Reconnectez-vous.';
+export const SESSION_EXPIRED_MESSAGE = 'Votre session a expiré. Veuillez vous reconnecter.';
+export const ACCOUNT_CHANGED_MESSAGE =
+  'Vous êtes maintenant connecté avec un autre compte (depuis un autre onglet). La page a été rechargée.';
 /** Valeur du paramètre `raison` de /connexion qui affiche le message de session expirée. */
 export const EXPIRED_REASON = 'expiree';
 /** Marge retirée à la durée de vie du jeton : on se déconnecte un peu avant que l'API ne refuse le jeton. */
@@ -37,7 +40,8 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly router = inject(Router);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly notifications = inject(NotificationService);
+  private readonly reloadPage = inject(PAGE_RELOAD);
 
   // Signal privé modifiable, exposé en lecture seule : seul ce service change la session.
   private readonly state = signal<Session | null>(null);
@@ -78,10 +82,20 @@ export class AuthService {
     this.apply(stored);
   }
 
-  /** Déconnexion volontaire (US-A3) : locale, sans appel à l'API (jeton sans état, ADR 0002). */
+  /**
+   * Déconnexion volontaire (US-A3) : locale, sans appel à l'API (jeton sans état, ADR 0002).
+   * On navigue D'ABORD : si la garde de sortie d'un formulaire modifié est refusée (« Rester »), la session
+   * reste ouverte et la saisie est conservée. Effacer avant aurait laissé une page admin sans session.
+   */
   logout(): void {
-    this.clear();
-    void this.router.navigateByUrl(DEFAULT_AFTER_LOGIN);
+    this.router
+      // 'reload' : déjà sur /evenements, la navigation est sinon ignorée et la promesse renvoie false.
+      .navigateByUrl(DEFAULT_AFTER_LOGIN, { onSameUrlNavigation: 'reload' })
+      .then(
+        (navigated) => navigated && this.clear(),
+        // Erreur de navigation (morceau de code non téléchargé, hors ligne…) : la déconnexion ne doit pas être bloquée.
+        () => this.clear(),
+      );
   }
 
   /**
@@ -100,7 +114,7 @@ export class AuthService {
         queryParams: { returnUrl: currentUrl, raison: EXPIRED_REASON },
       });
     } else {
-      this.snackBar.open(SESSION_EXPIRED_MESSAGE, 'OK', { duration: 8000 });
+      this.notifications.show(SESSION_EXPIRED_MESSAGE, 'warning');
     }
   }
 
@@ -140,11 +154,19 @@ export class AuthService {
 
   private onSessionChangedElsewhere(): void {
     const wasAdmin = this.isAdmin();
+    const previousUserId = this.state()?.userId ?? null;
     this.apply(readStoredSession());
+    const currentUserId = this.state()?.userId ?? null;
     const url = this.router.url;
     if (!this.isLoggedIn() && isProtectedUrl(url)) {
       // Déconnexion dans un autre onglet : on quitte la page réservée.
       void this.router.navigate(['/connexion'], { queryParams: { returnUrl: url } });
+    } else if (previousUserId && currentUserId && previousUserId !== currentUserId) {
+      // Connexion avec un AUTRE compte dans un autre onglet : la page affiche encore les données du compte
+      // précédent. Rechargement complet (aucun état de l'ancien compte ne survit, gardes rejouées) ;
+      // le message est conservé pour être affiché après le rechargement.
+      this.notifications.showAfterReload(ACCOUNT_CHANGED_MESSAGE, 'warning');
+      this.reloadPage();
     } else if (wasAdmin && !this.isAdmin() && url.startsWith('/admin')) {
       void this.router.navigateByUrl('/acces-refuse');
     }

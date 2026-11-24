@@ -1,0 +1,83 @@
+<section class="page page--wide">
+  <div class="title-row">
+    <h1>Administration — événements</h1>
+    <a mat-flat-button routerLink="nouveau">Nouvel événement</a>
+  </div>
+
+  <div class="filters">
+    <mat-form-field>
+      <mat-label>Statut</mat-label>
+      <mat-select [value]="status()" (selectionChange)="onStatusChange($event.value)">
+        <mat-option [value]="null">Tous</mat-option>
+        <mat-option value="Draft">Brouillon</mat-option>
+        <mat-option value="Published">Publié</mat-option>
+        <mat-option value="Cancelled">Annulé</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-label>Période</mat-label>
+      <mat-select [value]="period()" (selectionChange)="onPeriodChange($event.value)">
+        <mat-option value="upcoming">À venir</mat-option>
+        <mat-option value="past">Terminés</mat-option>
+        <mat-option value="all">Tous</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (errorMessage(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="events.reload()">Réessayer</button>
+    </div>
+  } @else if (events.isLoading()) {
+    <app-loading />
+  } @else if (events.value(); as result) {
+    @if (result.items.length === 0) {
+      <p class="muted">Aucun événement ne correspond à ces filtres.</p>
+    } @else {
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Titre</th>
+              <th scope="col">Statut</th>
+              <th scope="col">Début</th>
+              <th scope="col">Places</th>
+              <th scope="col">Prix</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (event of result.items; track event.id) {
+              <tr>
+                <td>
+                  <a [routerLink]="[event.id]">{{ event.title }}</a>
+                  <div class="muted small">{{ event.location }}</div>
+                </td>
+                <td>
+                  @for (label of statusLabels(event); track label) {
+                    <span class="chip">{{ label }}</span>
+                  }
+                </td>
+                <td>{{ event.startsAt | date: dateFormat }}</td>
+                <td>
+                  {{ event.remainingSeats }} / {{ event.capacity }} libres
+                  <div class="muted small">
+                    {{ event.pendingCount }} en attente, {{ event.confirmedCount }} confirmées
+                  </div>
+                </td>
+                <td>{{ event.price | tndPrice }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <app-pager
+      [page]="result.page"
+      [pageSize]="pageSize"
+      [totalCount]="result.totalCount"
+      (pageChange)="goToPage($event)"
+    />
+  }
+</section>
