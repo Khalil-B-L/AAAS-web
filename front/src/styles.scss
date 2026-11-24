@@ -1,6 +1,14 @@
-// Thème Angular Material 3 : mat.theme() génère des variables CSS (--mat-sys-*) utilisées par les composants
-// Material et par nos propres styles. Pour changer les couleurs de l'association : changer les palettes ici.
+// Thème Angular Material 3 aux couleurs de l'association.
+// 1. mat.theme() génère toutes les variables CSS --mat-sys-* (primary, surface, on-surface…) à partir de
+//    palettes tonales (13 nuances par couleur) ; les composants Material ne lisent QUE ces variables.
+// 2. mat.theme-overrides() remplace ensuite quelques-unes de ces variables par les valeurs exactes de la marque
+//    (une palette générée donne un vert proche, pas exactement #0F5C2E).
+// 3. mat.button-overrides() change les jetons d'un seul composant (bouton plein orange) sans toucher au reste.
+// 4. Nos propres styles lisent des variables --aaas-* : une seule source (_brand.scss), aucune couleur en dur ailleurs.
+@use 'sass:color';
 @use '@angular/material' as mat;
+@use './theme/brand';
+@use './theme/theme-colors';
 
 // Polices du système (aucun téléchargement, aucune requête vers Google Fonts : CSP stricte, ADR 0017).
 $system-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
@@ -10,8 +18,10 @@ html {
   @include mat.theme(
     (
       color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
+        // Palettes générées par « ng generate @angular/material:theme-color » (src/theme/_theme-colors.scss).
+        theme-type: light,
+        primary: theme-colors.$primary-palette,
+        tertiary: theme-colors.$tertiary-palette,
       ),
       typography: (
         plain-family: $system-font,
@@ -20,6 +30,41 @@ html {
       density: 0,
     )
   );
+
+  // Piège : une clé mal orthographiée est ignorée SANS erreur (seuls les noms de --mat-sys-* connus sont émis).
+  @include mat.theme-overrides(
+    (
+      primary: brand.$green,
+      on-primary: brand.$white,
+      // Fonds blancs (la palette neutre générée est légèrement teintée de vert).
+      surface: brand.$white,
+      background: brand.$white,
+    )
+  );
+
+  // Bouton plein (mat-flat-button) = action principale : orange vif, texte brun très foncé, en gras.
+  // Les boutons Material 3 ont déjà la forme « pilule » (corner-full) : rien à changer pour l'arrondi.
+  @include mat.button-overrides(
+    (
+      filled-container-color: brand.$orange,
+      filled-label-text-color: brand.$on-orange,
+      filled-label-text-weight: 700,
+      // Voile de survol / appui et onde du clic : teinte du texte, pas du blanc (on-primary par défaut).
+      filled-state-layer-color: brand.$on-orange,
+      filled-ripple-color: color.change(brand.$on-orange, $alpha: 0.12),
+      // Bouton secondaire (mat-stroked-button) : contour vert comme sur la maquette.
+      outlined-outline-color: brand.$green,
+    )
+  );
+
+  // Variables de marque pour nos propres styles (var(--aaas-green)…). Analogie .NET : des constantes
+  // dans une classe statique, mais lues par le navigateur et modifiables par zone (ex. pied de page).
+  --aaas-green: #{brand.$green};
+  --aaas-orange: #{brand.$orange};
+  --aaas-on-orange: #{brand.$on-orange};
+  --aaas-highlight: #{brand.$highlight};
+  --aaas-white: #{brand.$white};
+  --aaas-focus: var(--aaas-green);
 }
 
 body {
@@ -33,22 +78,32 @@ body {
 
 h1 {
   font: var(--mat-sys-headline-medium);
+  font-weight: 700;
+  color: var(--aaas-green);
   margin: 0 0 1rem;
 }
 
 h2 {
   font: var(--mat-sys-title-large);
+  font-weight: 700;
+  color: var(--aaas-green);
   margin: 1.5rem 0 0.75rem;
 }
 
 a {
-  color: var(--mat-sys-primary);
+  color: var(--aaas-green);
+}
+
+// Mot mis en avant dans un titre ou un texte (brun-orange, 5,02:1 sur blanc).
+.highlight {
+  color: var(--aaas-highlight);
 }
 
 // Focus clavier toujours visible (accessibilité) : Material le gère sur ses composants, on l'assure ailleurs.
 a:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--mat-sys-primary);
+  // --aaas-focus est redéfinie en blanc dans le pied de page (fond vert) : le cadre reste visible partout.
+  outline: 2px solid var(--aaas-focus);
   outline-offset: 2px;
 }
 

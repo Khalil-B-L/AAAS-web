@@ -41,6 +41,9 @@ export interface ConfirmDialogData {
     .danger {
       --mat-button-filled-container-color: var(--mat-sys-error);
       --mat-button-filled-label-text-color: var(--mat-sys-on-error);
+      // Le thème donne au bouton plein un voile de survol brun (texte de l'orange) : ici, celui du texte blanc.
+      --mat-button-filled-state-layer-color: var(--mat-sys-on-error);
+      --mat-button-filled-ripple-color: color-mix(in srgb, var(--mat-sys-on-error) 12%, transparent);
     }
   `,
 })

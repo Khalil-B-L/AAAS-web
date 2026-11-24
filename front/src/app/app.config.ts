@@ -27,7 +27,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([authInterceptor])),
     // Locale « fr » et dates à l'heure de Tunis pour tous les DatePipe.
     ...FORMATTING_PROVIDERS,
-    // Titre d'onglet « Page — Association ».
+    // Titre d'onglet « Page — A.A.A.S » (nom : core/config/app-info.ts).
     { provide: TitleStrategy, useClass: AppTitleStrategy },
     // Options des champs Material : voir shared/forms/form-field-defaults.ts (volontairement pas ici).
   ],

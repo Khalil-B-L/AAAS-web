@@ -298,3 +298,46 @@ Commandes : `npm test` (surveillance), `npm run test:ci` (une passe + couverture
 2. Transformer `NotificationService` pour garder une **file** de messages (signal de tableau, `update`).
 3. Remplacer `rxResource` par `httpResource` dans `MyAccount` et comparer (moins de code, mais plus de service `Observable`).
 4. Écrire le test « double clic sur Enregistrer : un seul PUT ».
+5. Ajouter `--aaas-green-light` dans `_brand.scss` et `styles.scss`, puis l'utiliser comme fond des cartes d'événements ; vérifier le contraste du texte avec un outil (ratio ≥ 4,5:1).
+
+## 16. Thème Material 3 et variables CSS (couleurs de l'association)
+
+**C'est quoi** : Material 3 ne lit pas des classes de couleur mais des **variables CSS** (`--mat-sys-primary`, `--mat-sys-surface`, `--mat-sys-on-primary`…). `mat.theme()` (Sass) les génère à partir de **palettes tonales** : 13 nuances par couleur (tons 0 à 100) ; `primary` = ton 40, `primary-container` = ton 90, etc. Analogie .NET : un `appsettings.json` dont chaque composant lit ses clés ; changer une clé change tous les composants qui la lisent.
+
+Dans AAAS, trois niveaux (`front/src/styles.scss`) :
+
+```scss
+@use './theme/brand';          // _brand.scss : les 5 couleurs en dur, seule source
+@use './theme/theme-colors';   // palettes générées par ng generate @angular/material:theme-color
+
+html {
+  @include mat.theme((color: (theme-type: light, primary: theme-colors.$primary-palette,
+                              tertiary: theme-colors.$tertiary-palette), …));
+  @include mat.theme-overrides((primary: brand.$green, surface: brand.$white));   // valeurs exactes
+  @include mat.button-overrides((filled-container-color: brand.$orange,           // un seul composant
+                                 filled-label-text-color: brand.$on-orange));
+  --aaas-green: #{brand.$green};   // pour NOS styles : color: var(--aaas-green)
+}
+```
+
+- **Palette générée ≠ couleur de marque** : à partir de `#0F5C2E`, le générateur donne un `primary` (ton 40) `#236b3b`. `theme-overrides` remet la valeur exacte.
+- **`*-overrides`** : jetons d'un composant (`mat.button-overrides`, `mat.form-field-overrides`…) ; portée = le sélecteur où on l'inclut. Pour un seul bouton : redéfinir la variable sur une classe (`.danger { --mat-button-filled-container-color: var(--mat-sys-error); }` dans `confirm-dialog.ts`).
+- **Variables CSS en cascade** : une variable redéfinie sur un élément vaut pour tous ses descendants. Le pied de page fait `--aaas-focus: white` : le cadre de focus global (`outline: 2px solid var(--aaas-focus)`) devient blanc sur fond vert, sans règle spéciale.
+- Sass (`$green`) est résolu **à la compilation** ; une variable CSS (`--aaas-green`) **dans le navigateur** (modifiable par zone, visible dans les outils de développement, onglet « Calculé »).
+- **Boutons M3** : forme « pilule » par défaut (`corner-full`) ; rien à faire pour l'arrondi.
+
+**Contraste (WCAG 2.x, niveau AA)** : 4,5:1 pour le texte normal, 3:1 pour le gros texte (≥ 24 px, ou ≥ 18,66 px en gras) et les éléments d'interface. Mesuré dans AAAS : blanc sur orange `#FF7A00` = **2,61:1**, insuffisant **même** en gros texte gras → texte brun très foncé `#2B1600` (6,60:1). Vert `#0F5C2E` / blanc = 8,11:1 ; brun-orange `#B45309` / blanc = 5,02:1. Tableau complet : `docs/technique/etat-avancement.md` § 1.4.
+
+**Logo sans décalage de mise en page** : `<img width="52" height="48">` (composant `shared/ui/brand-logo.ts`) : le navigateur réserve la place avant le téléchargement (indicateur CLS de Core Web Vitals). Fichier dans `front/public/` (copié tel quel à la racine du site) : servi par le même site, la CSP `img-src 'self'` l'autorise.
+
+**Pièges** :
+- `mat.theme-overrides` **ignore sans erreur** une clé inconnue (faute de frappe) : vérifier le CSS compilé (`grep -- --mat-sys-primary dist/front/browser/styles-*.css`) ou l'onglet « Calculé » du navigateur.
+- Changer la couleur d'un bouton plein change aussi son **voile de survol** (`filled-state-layer-color`) : le régler avec le texte.
+- Ne jamais lire une couleur de marque en dur dans un composant (`#0f5c2e`) : passer par `var(--aaas-…)` ou `var(--mat-sys-…)`.
+
+**Commandes** : `npx ng generate @angular/material:theme-color --primary-color="#0F5C2E" --tertiary-color="#FF7A00" --directory="src/theme/"` (génère `_theme-colors.scss`) ; `npm run build` puis lecture de `styles-*.css`.
+
+**Questions d'entretien** :
+- *Comment personnaliser les couleurs d'Angular Material 3 ?* Palettes passées à `mat.theme()` (générées depuis un hex par le schematic `theme-color`), puis `mat.theme-overrides()` pour des valeurs exactes et `mat.<composant>-overrides()` pour un composant.
+- *Variable Sass ou variable CSS ?* Sass : constante de compilation, disparaît du CSS. CSS : résolue par le navigateur, héritée, redéfinissable par zone et à l'exécution (thème sombre, zone colorée).
+- *Comment éviter le décalage de mise en page dû à une image ?* Donner `width` et `height` (ou `aspect-ratio`) pour réserver la place.

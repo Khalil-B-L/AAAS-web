@@ -3,7 +3,7 @@ import { Title } from '@angular/platform-browser';
 import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
 import { APP_INFO } from './app-info';
 
-/** « Événements — Association » : titre d'onglet construit à partir du `title` de la route. */
+/** « Événements — A.A.A.S » : titre d'onglet construit à partir du `title` de la route. */
 export function pageTitle(title: string | undefined | null): string {
   return title ? `${title} — ${APP_INFO.name}` : APP_INFO.name;
 }

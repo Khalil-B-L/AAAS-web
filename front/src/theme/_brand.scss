@@ -1,0 +1,19 @@
+// Couleurs de l'association A.A.A.S : SEUL endroit où elles sont écrites en dur.
+// styles.scss les expose en variables CSS (--aaas-*) et les injecte dans le thème Material.
+// Valeurs lues sur la maquette du porteur (approximatives, à affiner avec lui).
+// Ratios WCAG mesurés le 24/11/2026 : voir docs/revision/angular.md, § 16.
+
+// Vert foncé : en-tête (filet), pied de page, titres, liens, boutons secondaires. Blanc dessus : 8,11:1.
+$green: #0f5c2e;
+
+// Orange vif : fond des boutons principaux UNIQUEMENT. Jamais comme couleur de texte (2,61:1 sur blanc),
+// jamais de texte blanc dessus (2,61:1, sous le seuil de 3:1 même pour le gros texte en gras).
+$orange: #ff7a00;
+
+// Texte sur l'orange vif : brun très foncé, 6,60:1 (AA quel que soit le corps).
+$on-orange: #2b1600;
+
+// Brun-orange : mots mis en avant, soulignement de l'onglet actif. Sur blanc : 5,02:1 (AA).
+$highlight: #b45309;
+
+$white: #ffffff;

@@ -18,7 +18,7 @@
 
 | Écran | Route | User story |
 |---|---|---|
-| Coquille : en-tête (menu selon le rôle, « Bonjour {prénom} », menu mobile), pied de page | — | — |
+| Coquille : en-tête (logo, menu selon le rôle, « Bonjour {prénom} », menu mobile), pied de page (logo, confidentialité) ; thème aux couleurs de l'association (24/11, § 1.4) | — | — |
 | Inscription (téléphone +216, case de consentement, connexion automatique) | `/inscription` | US-A1 |
 | Connexion (retour à la page demandée, message de session expirée), déconnexion | `/connexion` | US-A2, US-A3 |
 | Mon compte (lecture) | `/mon-compte` | US-F3 (lecture) |
@@ -62,6 +62,32 @@ Image Docker du front (Node → nginx non-root), service `front` dans `docker-co
 | `core/api`, `core/config` | 69 %, 70 % | services HTTP fins non testés un par un ; `AppTitleStrategy` |
 | `app.routes.ts` | 10 % | `loadComponent` non exécutés en test unitaire (vérifiés par le parcours navigateur) |
 | **Total** | **90,9 %** (lignes 92,1 %, branches 89,2 %) | 240 tests (24/11) ; 90,4 % le 23/11 avec 236 tests |
+
+### 1.4 Identité visuelle A.A.A.S (24/11/2026)
+
+| Élément | Où | Détail |
+|---|---|---|
+| Nom, nom officiel, logo | `front/src/app/core/config/app-info.ts` (seul endroit) + `<title>` de `index.html` | « A.A.A.S », « Association d'amitié et d'action sociale » (texte du logo, **à confirmer avec les statuts**) ; adresse, e-mail et date de la politique restent entre crochets (D3) |
+| Logo | `front/public/logo-aaas.jpg` (466 × 429, 22 Ko) | composant `shared/ui/brand-logo.ts` : en-tête (48 px de haut), pied de page (40 px dans un rond blanc de 64 px), page de connexion (120 px) ; `width`/`height` fixés (pas de décalage), `alt` = nom complet |
+| Favicon | `front/public/favicon.ico` (16, 32, 48 px), `apple-touch-icon.png` (180 px) | générés à partir du logo, recadrés sur les deux mains (le texte serait illisible à 16 px) |
+| Couleurs | `front/src/theme/_brand.scss` (seule source) | vert `#0F5C2E`, orange `#FF7A00`, texte sur orange `#2B1600`, brun-orange `#B45309` ; valeurs **approximatives** lues sur la maquette |
+| Thème Material | `front/src/styles.scss`, palettes `front/src/theme/_theme-colors.scss` (générées par `ng generate @angular/material:theme-color`) | primaire vert, tertiaire orange ; surcharges exactes (`mat.theme-overrides`), bouton plein orange (`mat.button-overrides`) ; variables `--aaas-*` pour nos styles |
+| CSP nginx | inchangée | logo et icônes servis par le même site (`img-src 'self'`) |
+
+Contrastes WCAG mesurés (formule de luminance relative WCAG 2.x) :
+
+| Texte / fond | Ratio | Usage | AA |
+|---|---|---|---|
+| blanc / vert `#0F5C2E` | 8,11:1 | pied de page | oui (AAA) |
+| vert / blanc | 8,11:1 | titres, liens, menu, contour des boutons secondaires | oui (AAA) |
+| brun-orange `#B45309` / blanc | 5,02:1 | mots mis en avant (`.highlight`), souligné de l'onglet actif | oui |
+| `#2B1600` / orange `#FF7A00` | 6,60:1 | texte des boutons principaux | oui |
+| blanc / orange `#FF7A00` | **2,61:1** | **interdit**, même en gros texte gras (seuil 3:1) | non |
+| orange / blanc | **2,61:1** | **jamais en couleur de texte** | non |
+| vert / orange | 3,10:1 | non utilisé (insuffisant en petit corps) | non |
+| texte courant `#191D19` / blanc | 17,06:1 | corps de texte (Material `on-surface`) | oui |
+
+Vérifié le 24/11 : `npm run lint` OK ; `npm run test:ci` **243 tests, 21 fichiers, verts quatre fois de suite** (couverture 91,1 %) ; `npm run build` OK sans avertissement, bundle initial **427 Ko bruts / 109 Ko transférés**. Non vérifié : rendu dans un navigateur et dans le conteneur (à faire par le porteur : `docker compose up -d --build front`, puis http://127.0.0.1:4200).
 
 Pistes pour le `testeur` : `Header` (menu mobile, « Se déconnecter »), services de `core/api` un par un, `AppTitleStrategy`, et l'instabilité signalée au § 1.2.
 
@@ -123,7 +149,7 @@ Recommandation du plan front (question P-1, défaut accepté par le porteur) : a
 | # | Sujet | Pour qui | État / proposition |
 |---|---|---|---|
 | D1 | ~~**401 au lieu de 404** pour un visiteur sur `/api/events/<pas-un-guid>`~~ | expert-technique (API) | **résolu le 23/11/2026** : API corrigée. Route de repli `GET /api/events/{id}` sans contrainte (`EventsController.GetMalformedId`, anonyme, GET seulement) → 404 `not_found` identique à un identifiant inconnu. Routes admin : repli `AdminEventsController.MalformedId` soumis à `AdminOnly` → visiteur 401, membre 403 (avant : 404, fuite), admin 404. Tests : `tests/Aaas.Api.IntegrationTests/Events/MalformedIdTests.cs` ; `api.md` à jour |
-| D2 | Nom affiché, logo, couleurs de l'association (UX-2) | porteur | valeurs neutres dans `front/src/app/core/config/app-info.ts` (« Association ») et `<title>` de `index.html` ; palette dans `styles.scss` |
+| D2 | Nom affiché, logo, couleurs de l'association (UX-2) | porteur | **fait le 24/11/2026** (§ 1.4) : « A.A.A.S », logo officiel, palette de la maquette. Reste à confirmer : nom officiel exact (statuts), valeurs exactes des couleurs (lues approximativement sur la maquette), rendu à l'œil |
 | D3 | Politique de confidentialité : nom officiel, adresse, e-mail, date de mise en ligne, déclaration INPDP | porteur / association | texte provisoire publié avec la mention « Version provisoire » ; champs entre crochets dans `app-info.ts` ; tout changement du texte = nouvelle version (`PrivacyPolicy:CurrentVersion`) |
 | D4 | Message « compte bloqué » : `libelles-ecrans.md` propose un texte générique, le front affiche celui de l'API (avec la durée) | expert-fonctionnel | garder le message de l'API (plus précis) ; à confirmer |
 | D5 | Passage aux tranches verticales (P-1) à reporter dans le cahier § 8 | porteur / expert-fonctionnel | défaut accepté, cahier à mettre à jour |

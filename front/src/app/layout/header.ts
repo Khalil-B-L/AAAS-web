@@ -3,11 +3,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { APP_INFO } from '../core/config/app-info';
+import { BrandLogo } from '../shared/ui/brand-logo';
 
-/** En-tête : nom de l'association, menu selon la session (visiteur, membre, admin), menu repliable sur téléphone. */
+/** En-tête : logo et nom de l'association, menu selon la session (visiteur, membre, admin), menu repliable sur téléphone. */
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, RouterLinkActive, MatButtonModule],
+  imports: [RouterLink, RouterLinkActive, MatButtonModule, BrandLogo],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './header.html',
   styleUrl: './header.scss',

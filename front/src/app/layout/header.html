@@ -1,8 +1,6 @@
 <header class="toolbar">
   <a class="brand" routerLink="/evenements" (click)="closeMenu()">
-    @if (appInfo.logoUrl) {
-      <img [src]="appInfo.logoUrl" alt="" class="brand__logo" />
-    }
+    <app-brand-logo [height]="48" />
     <span>{{ appInfo.name }}</span>
   </a>
 

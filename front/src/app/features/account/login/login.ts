@@ -11,14 +11,30 @@ import { toApiError } from '../../../core/errors/api-error';
 import { applyServerErrors } from '../../../core/errors/apply-server-errors';
 import { FORM_FIELD_DEFAULTS } from '../../../shared/forms/form-field-defaults';
 import { FieldErrors } from '../../../shared/forms/field-errors';
+import { BrandLogo } from '../../../shared/ui/brand-logo';
 
 /** Connexion (US-A2). Après succès : retour à `returnUrl` (validé) ou aux événements (UX-10). */
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink, MatFormFieldModule, MatInputModule, MatButtonModule, FieldErrors],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    FieldErrors,
+    BrandLogo,
+  ],
   providers: [FORM_FIELD_DEFAULTS],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './login.html',
+  styles: `
+    .login-logo {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+  `,
 })
 export class Login {
   private readonly authApi = inject(AuthApi);
