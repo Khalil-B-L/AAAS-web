@@ -1,0 +1,100 @@
+<section class="page">
+  <h1>Mes réservations</h1>
+
+  @if (loadError(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="reload()">Réessayer</button>
+    </div>
+  } @else if (isEmpty()) {
+    <p>Vous n'avez aucune réservation.</p>
+    <a mat-stroked-button routerLink="/evenements">Voir les événements à venir</a>
+  } @else {
+    <h2>À venir</h2>
+    <ng-container *ngTemplateOutlet="section; context: { $implicit: 'current' }" />
+    <h2>Historique</h2>
+    <ng-container *ngTemplateOutlet="section; context: { $implicit: 'history' }" />
+  }
+</section>
+
+<!-- ng-template : un fragment de template réutilisé pour les deux sections (≈ une vue partielle Razor). -->
+<ng-template #section let-scope>
+  @if (page(scope); as result) {
+    @if (result.items.length === 0) {
+      <p class="muted">{{ scope === 'current' ? 'Aucune réservation à venir.' : 'Aucune réservation passée.' }}</p>
+    } @else {
+      <ul class="reservations">
+        @for (r of result.items; track r.id) {
+          <li class="reservation">
+            <div class="reservation__head">
+              @if (r.event.isVisible) {
+                <a [routerLink]="['/evenements', r.event.id]" class="reservation__title">{{ r.event.title }}</a>
+              } @else {
+                <span class="reservation__title">{{ r.event.title }}</span>
+                <span class="chip chip--closed">Événement indisponible</span>
+              }
+              <span class="chip" [class.chip--closed]="scope === 'history'">
+                {{ statusLabel(r.status) }}@if (r.event.hasEnded) { — Terminé }
+              </span>
+            </div>
+            <p class="muted">
+              {{ r.event.startsAt | date: listFormat }} · {{ r.event.location }} ·
+              @if (r.isPaid) {
+                Payée{{ r.paidAt ? ' le ' + (r.paidAt | date: dayFormat) : '' }}
+              } @else {
+                {{ r.event.price | tndPrice }}
+              }
+            </p>
+            <p class="muted">Demandée le {{ r.requestedAt | date: listFormat }}</p>
+
+            @if (r.status === 'Pending') {
+              <p>À faire confirmer avant le {{ r.expiresAt | date: detailFormat }}</p>
+            }
+            @if (r.status === 'Refused' && r.refusalReason) {
+              <p>Motif : {{ r.refusalReason }}</p>
+            }
+            @if (r.status === 'CancelledByAssociation' && r.isPaid) {
+              <p>
+                Cette réservation est marquée payée : le remboursement éventuel se règle directement avec
+                l'association.
+              </p>
+            }
+
+            @if (r.canCancel) {
+              <div class="actions">
+                <button mat-stroked-button type="button" [disabled]="busyId() !== null" (click)="cancel(r)">
+                  {{ r.status === 'Pending' ? 'Annuler ma demande' : 'Annuler ma réservation' }}
+                </button>
+              </div>
+            } @else if (r.status === 'Confirmed' && !r.event.hasStarted) {
+              <p>Le délai d'annulation est dépassé. Pour vous désister, contactez l'association.</p>
+              <app-contact-card />
+            }
+
+            @if (rowError(); as error) {
+              @if (error.id === r.id) {
+                <div class="banner banner--error" role="alert">
+                  <p>{{ error.message }}</p>
+                </div>
+                @if (error.showContact) {
+                  <app-contact-card />
+                }
+              }
+            }
+            @if (r.status === 'Pending') {
+              <app-contact-card />
+            }
+          </li>
+        }
+      </ul>
+      <app-pager
+        [page]="result.page"
+        [pageSize]="pageSize"
+        [totalCount]="result.totalCount"
+        (pageChange)="scope === 'current' ? currentPage.set($event) : historyPage.set($event)"
+      />
+    }
+  } @else {
+    <app-loading />
+  }
+</ng-template>

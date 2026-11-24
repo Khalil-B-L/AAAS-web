@@ -20,6 +20,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     {
         ["Jwt:SigningKey"] = SigningKey,
         ["Database:MigrateOnStartup"] = "true",
+        // Tâche d'expiration coupée par défaut : un test ne doit pas voir une ligne changer « dans son dos ».
+        // Les tests qui la visent la réactivent (Reservations/ExpirationJobTests).
+        ["Reservations:ExpirationJob:Enabled"] = "false",
     };
 
     private readonly TimeProvider? _clock;

@@ -5,7 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { EventsApi } from '../../../core/api/events.api';
-import { AuthService } from '../../../core/auth/auth.service';
+import { ReservationPanel } from '../../reservations/reservation-panel/reservation-panel';
 import { pageTitle } from '../../../core/config/app-title.strategy';
 import { toApiError } from '../../../core/errors/api-error';
 import { DETAIL_DATE_FORMAT, TIME_FORMAT } from '../../../core/time/date-formats';
@@ -16,17 +16,16 @@ import { TndPricePipe } from '../../../shared/pipes/tnd-price.pipe';
 import { Loading } from '../../../shared/ui/loading';
 import { NotFound } from '../../../layout/not-found';
 
-/** Détail d'un événement (US-C2, partie visiteur). Brouillon ou inconnu : « Contenu introuvable » à la même URL. */
+/** Détail d'un événement (US-C2) avec le panneau « Ma réservation ». Brouillon ou inconnu : « Contenu introuvable » à la même URL. */
 @Component({
   selector: 'app-event-detail',
-  imports: [DatePipe, RouterLink, MatButtonModule, TndPricePipe, Loading, NotFound],
+  imports: [DatePipe, RouterLink, MatButtonModule, TndPricePipe, Loading, NotFound, ReservationPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './event-detail.html',
   styleUrl: './event-detail.scss',
 })
 export class EventDetail {
   private readonly api = inject(EventsApi);
-  protected readonly auth = inject(AuthService);
   private readonly title = inject(Title);
 
   /** Paramètre de route :id (withComponentInputBinding). */
@@ -53,9 +52,6 @@ export class EventDetail {
     const detail = this.detail();
     return detail ? eventMention(detail) : null;
   });
-
-  /** Retour après connexion : on revient sur cet événement (US-C2). */
-  protected readonly loginQueryParams = computed(() => ({ returnUrl: `/evenements/${this.id()}` }));
 
   protected readonly detailFormat = DETAIL_DATE_FORMAT;
   protected readonly timeFormat = TIME_FORMAT;

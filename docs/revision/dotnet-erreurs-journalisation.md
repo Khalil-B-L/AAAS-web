@@ -87,3 +87,10 @@ throw new InvalidOperationException($"{safeMessage} ({type}, erreur SQL : {sqlNu
 - **Que se passe-t-il si `IExceptionHandler.TryHandleAsync` renvoie `false` ?** Le handler suivant est essayé, puis le comportement par défaut du middleware, qui journalise l'exception (et la relance si personne ne répond).
 - **Pourquoi mon dernier log n'apparaît-il pas quand l'application plante au démarrage ?** Le logger console est asynchrone (file + thread d'arrière-plan) ; le processus meurt avant que la file soit vidée. Il faut disposer l'hôte (ou la `LoggerFactory`) avant de laisser l'exception sortir de `Main`.
 - **Comment gérer « créer si absent » avec plusieurs instances ?** Contrainte d'unicité en base + interception de la violation + revérification (ou `MERGE`/verrou applicatif). Le `if (!exists)` seul ne suffit pas.
+
+## Ajout tranche Réservations (24/11/2026)
+
+- **Extensions de ProblemDetails** : `BusinessRuleException` porte un dictionnaire `Details` ; `ApiExceptionHandler` recopie chaque entrée dans `problem.Extensions` (`currentStatus`, `reservationId`). Le contrat des 409 s'enrichit sans nouveau type d'exception. Règle : jamais de donnée personnelle dans `Details` (seulement des GUID et des statuts).
+- **Exception neutre sans `InnerException`** : `UniqueConstraintViolationException` (Application) remplace la `DbUpdateException` d'une violation d'index unique (Infrastructure) : le message SQL d'origine contient les valeurs dupliquées (R24). Le service la traduit en 409 `already_reserved`.
+- **En-tête sur toutes les réponses, erreurs comprises** : `Response.OnStarting(...)` dans un petit middleware (`NoStoreMiddleware`) pose `Cache-Control: no-store` au moment où la réponse part. Un filtre MVC ne suffirait pas : `UseExceptionHandler` **vide les en-têtes** avant d'écrire le ProblemDetails, et les 401/403 de l'authentification ne passent pas par MVC. Le middleware est placé **avant** `UseExceptionHandler`.
+- Test : `ReservationRulesTests.Logs_contain_no_personal_data` rejoue tout le parcours (demande, 409, annulation, listes) avec les commandes SQL journalisées et vérifie qu'aucun e-mail, téléphone ni nom n'apparaît.

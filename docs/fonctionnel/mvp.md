@@ -1,7 +1,7 @@
 # Cadrage fonctionnel du MVP — AAAS
 
 > Rédigé par l'expert fonctionnel. Document de référence pour l'agent `architecte` (choix techniques) et l'agent `testeur` (les scénarios Gherkin servent de base aux tests).
-> Statut : **proposition, version 4**, mise à jour avec les décisions du porteur de projet (cahier des charges v1.2). Les valeurs par défaut marquées *(défaut)* sont à confirmer avec l'association (voir § 5).
+> Statut : **proposition, version 5**, mise à jour avec les décisions du porteur de projet (cahier des charges v1.4). Les valeurs par défaut marquées *(défaut)* sont à confirmer avec l'association (voir § 5).
 
 ### Décisions du porteur de projet (version 2)
 - L'association est en **Tunisie**. L'application est **en français uniquement**.
@@ -26,6 +26,18 @@
 - **Brouillon** : un admin **peut le supprimer** dès l'étape 2, **uniquement s'il n'a jamais été publié**. Voir R15, US-E2.
 - Les autres questions de l'étape 2 gardent la **valeur par défaut** proposée par l'architecte (événement en cours listé, format du prix, changement de lieu sans avertissement, avertissement « numéro non configuré » non bloquant, 20 événements par page). Voir Q18 à Q27.
 
+### Décisions du porteur de projet (version 5, cahier des charges v1.4 — tranche « Réservations »)
+Le porteur **accepte toutes les valeurs par défaut** du plan `technique/plan-reservations.md` : questions **QF-1 à QF-10** et décisions **P-R1 à P-R8**.
+- **Administrateur et réservation** : un admin peut demander une place pour lui-même, comme un membre (QF-1, R31).
+- **Échéance** : elle suit un changement de date de l'événement ; le délai de 24 h d'annulation d'une réservation confirmée se compte depuis le début **actuel** (QF-2, R30, R6, R9).
+- **Après un refus, une expiration ou une annulation** : le détail de l'événement affiche une information sur la demande précédente, et le bouton « Demander une place » si l'événement est réservable (QF-3, US-C2). Pas de limite du nombre de nouvelles demandes après un refus (QF-10, R33).
+- **Mention « Payée »** : posable même après la fin de l'événement ; retirable même sur une réservation annulée (QF-4, QF-5, R13, US-E7).
+- **Inscrits** : confirmées triées par nom puis prénom (QF-6, US-E4).
+- **Historique** : une réservation confirmée d'un événement terminé va dans « Historique » avec la mention « Terminé » (QF-7, US-D2).
+- **Libellés** validés (QF-8) : voir `libelles-ecrans.md` (version 1.1).
+- **Politique de confidentialité** : elle mentionne que les administrateurs voient les coordonnées des inscrits (QF-9, R32) ; texte en version 1.1-provisoire.
+- **Décisions P-R1 à P-R8** (plan) ayant un effet fonctionnel : délais 48 h et 24 h en configuration, non modifiables par l'admin depuis l'interface (P-R4) ; un double clic sur « Demander une place » ne crée qu'une demande et ne montre pas d'erreur (P-R5, US-D1) ; l'application **n'enregistre pas** quel admin a confirmé ou refusé une demande, seulement celui qui a marqué « Payée » (P-R6, US-E6, US-E7) ; la liste des inscrits n'est pas paginée (P-R7, US-E4). P-R1 à P-R3 et P-R8 sont techniques (validation des ADR, tâche d'expiration en arrière-plan toutes les 5 minutes, ordre des tâches) : voir l'architecte.
+
 ### Correspondance du vocabulaire (cahier des charges / ce document)
 
 | Cahier des charges | Ce document | Dans le code (indication de l'architecte) |
@@ -35,7 +47,7 @@
 | Administrateur | Administrateur | rôle `Admin` |
 | RG-xx (règles obligatoires, § 5.2 du cahier) | R-xx (règles détaillées, § 4 ci-dessous) | — |
 
-Correspondance des règles : RG-01 = R2, RG-02 = R5 et R7, RG-03 = R4, RG-04 = R6, RG-05 = R9, RG-06 = R11, RG-07 = R14 et R15, RG-08 = R12 et R13, RG-09 = R22, RG-10 = R8, RG-11 = R20, RG-12 = R28, RG-13 = R11, R12 et R29, RG-14 = R19. En cas de contradiction, le cahier des charges fait foi.
+Correspondance des règles : RG-01 = R2, RG-02 = R5 et R7, RG-03 = R4, R31 et R33, RG-04 = R6 et R30, RG-05 = R9, RG-06 = R11, RG-07 = R14 et R15, RG-08 = R12 et R13, RG-09 = R22, RG-10 = R8, RG-11 = R20, RG-12 = R28 (et R30 pour le recalcul), RG-13 = R11, R12 et R29, RG-14 = R19, RG-15 = R32. En cas de contradiction, le cahier des charges fait foi.
 
 ---
 
@@ -49,7 +61,7 @@ Permettre à l'association de **publier ses actualités et ses événements**, e
 |---|---|---|
 | **Visiteur** | Toute personne non connectée | Lire les actualités publiées, voir les événements à venir (prix, places restantes), créer un compte, se connecter. |
 | **Utilisateur** | Personne ayant un compte et connectée | Tout ce que fait le visiteur + demander une place, voir le numéro de l'administrateur à contacter, suivre ses réservations, annuler, supprimer son compte. |
-| **Administrateur** | Bénévole désigné par l'association | Gérer les actualités et les événements ; confirmer ou refuser les demandes ; marquer une réservation comme payée ; voir les inscrits ; annuler une réservation ou un événement ; configurer (ou retirer) le numéro de contact. |
+| **Administrateur** | Bénévole désigné par l'association | Gérer les actualités et les événements ; confirmer ou refuser les demandes ; marquer une réservation comme payée ; voir les inscrits **et leurs coordonnées** (R32) ; annuler une réservation ou un événement ; configurer (ou retirer) le numéro de contact ; **et, comme un utilisateur, demander une place pour lui-même (R31)**. |
 | **Application** (traitement automatique) | — | Faire passer en « Expirée » les demandes non traitées dans le délai. |
 
 L'**assistant RAG** (questions sur les documents de l'association) est prévu **plus tard** (semaine 4) et n'est pas cadré ici.
@@ -58,7 +70,7 @@ L'**assistant RAG** (questions sur les documents de l'association) est prévu **
 
 ## 2. Cycle de vie d'une réservation
 
-Une réservation est **active** quand elle est **En attente** ou **Confirmée**. Seules les réservations actives occupent une place.
+Une réservation est **active** quand elle est **En attente** (échéance non dépassée) ou **Confirmée**. Seules les réservations actives occupent une place.
 
 **Places restantes = capacité − (nombre de réservations En attente + Confirmées).**
 
@@ -71,22 +83,24 @@ Une réservation est **active** quand elle est **En attente** ou **Confirmée**.
 | **Annulée par l'utilisateur** | L'utilisateur s'est désisté | Non | Oui |
 | **Annulée par l'association** | L'admin l'a annulée ou l'événement a été annulé | Non | Oui |
 
+Une demande En attente **dont l'échéance est passée est expirée**, même si la mise à jour automatique n'est pas encore passée : tous les écrans l'affichent « Expirée » et elle ne compte plus dans les places occupées (R6).
+
 ### Transitions autorisées
 
 | De | Vers | Qui | Condition |
 |---|---|---|---|
-| *(aucun)* | En attente | Utilisateur | L'événement est réservable (R2) et l'utilisateur n'a pas déjà de réservation active pour cet événement. |
+| *(aucun)* | En attente | Utilisateur (ou administrateur pour lui-même, R31) | L'événement est réservable (R2) et l'utilisateur n'a pas déjà de réservation active pour cet événement. |
 | En attente | Confirmée | Admin | Avant l'échéance d'expiration et avant le début de l'événement. |
-| En attente | Refusée | Admin | Avant le début de l'événement. Un motif est facultatif *(défaut)*. |
-| En attente | Expirée | Application | L'échéance est atteinte : **48 h après la demande, ou au début de l'événement si c'est plus tôt**. |
+| En attente | Refusée | Admin | Avant l'échéance (donc avant le début de l'événement). Un motif est facultatif *(défaut)*. |
+| En attente | Expirée | Application | L'échéance est atteinte : **48 h après la demande, ou au début de l'événement si c'est plus tôt** ; l'échéance est **recalculée** si la date de l'événement change (R30). |
 | En attente | Annulée par l'utilisateur | Utilisateur | Avant le début de l'événement (pas de délai). |
 | En attente | Annulée par l'association | Admin / annulation de l'événement | Avant la fin de l'événement. |
-| Confirmée | Annulée par l'utilisateur | Utilisateur | Jusqu'à **24 h avant le début** (limite comprise) *(défaut)*. |
+| Confirmée | Annulée par l'utilisateur | Utilisateur | Jusqu'à **24 h avant le début actuel** de l'événement (limite comprise) *(défaut)*. |
 | Confirmée | Annulée par l'association | Admin / annulation de l'événement | Avant la fin de l'événement. |
 
 Toute autre transition est **interdite**. En particulier, un statut final ne change plus : une demande refusée ou expirée ne peut pas être confirmée ; l'utilisateur doit faire une nouvelle demande.
 
-**« Payée »** n'est pas un statut. C'est une **mention** que l'admin ajoute à une réservation **Confirmée** d'un événement **payant** (règle R13). Elle reste visible si la réservation est ensuite annulée, pour que l'association puisse gérer un éventuel remboursement en dehors de l'application.
+**« Payée »** n'est pas un statut. C'est une **mention** que l'admin ajoute à une réservation **Confirmée** d'un événement **payant** (règle R13), **à tout moment, même après la fin de l'événement**. Elle reste visible si la réservation est ensuite annulée, pour que l'association puisse gérer un éventuel remboursement en dehors de l'application, et l'admin peut la **retirer** (erreur de saisie), même sur une réservation annulée.
 
 ---
 
@@ -306,7 +320,7 @@ Fonctionnalité: Liste des événements
     Alors un message indique "Aucun événement prévu pour le moment"
 ```
 
-#### US-C2 — Voir le détail d'un événement *(modifiée : prix, statut de ma demande ; v4 : événement terminé)*
+#### US-C2 — Voir le détail d'un événement *(modifiée : prix, statut de ma demande ; v4 : événement terminé ; v5 : dernière demande finale, événement non réservable)*
 > En tant que **visiteur**, je veux **voir le détail d'un événement** afin de **savoir s'il me convient avant de demander une place**.
 
 ```gherkin
@@ -330,6 +344,21 @@ Fonctionnalité: Détail d'un événement
     Alors je vois "Réservation confirmée"
     Et je peux annuler si le délai d'annulation n'est pas dépassé
 
+  Scénario: Dernière demande refusée, expirée ou annulée, événement réservable
+    Étant donné que je suis connecté et que ma dernière demande pour cet événement est refusée (avec le motif "Réservé aux adhérents"), expirée ou annulée
+    Et que l'événement est réservable
+    Quand j'ouvre l'événement
+    Alors je vois une information sur ma demande précédente ("Votre demande précédente a été refusée." suivie du motif s'il y en a un, ou "Votre demande précédente a expiré sans être confirmée.", ou "Vous avez annulé votre demande précédente.")
+    Et le bouton "Demander une place" est proposé
+
+  Scénario: Dernière demande finale, événement non réservable
+    Étant donné que je suis connecté et que ma dernière demande est refusée ou expirée
+    Et que l'événement est complet, déjà commencé ou annulé
+    Quand j'ouvre l'événement
+    Alors je vois l'information sur ma demande précédente
+    Et aucun bouton "Demander une place" n'est proposé
+    Et la raison est indiquée ("Cet événement est complet.", "Les réservations sont closes." ou "Cet événement a été annulé.")
+
   Scénario: Événement terminé (historique conservé)
     Étant donné un événement publié dont l'heure de fin est dépassée
     Quand j'ouvre son adresse directement (par exemple depuis "Mes réservations")
@@ -344,7 +373,7 @@ Fonctionnalité: Détail d'un événement
 
 ### Épique D — Réservations
 
-#### US-D1 — Demander une place *(modifiée : réservation en deux temps)*
+#### US-D1 — Demander une place *(modifiée : réservation en deux temps ; v5 : alignée sur le plan des réservations)*
 > En tant qu'**utilisateur**, je veux **demander une place pour un événement** afin que **l'association me la réserve**.
 
 ```gherkin
@@ -365,6 +394,7 @@ Fonctionnalité: Demande de réservation
     Étant donné un événement de 20 places avec 20 réservations actives (en attente ou confirmées)
     Quand je tente de demander une place
     Alors la demande est refusée avec le message "Événement complet"
+    Et aucune réservation n'est créée
 
   Scénario: Dernière place demandée par deux personnes en même temps
     Étant donné un événement avec 1 seule place restante
@@ -373,28 +403,58 @@ Fonctionnalité: Demande de réservation
     Et l'autre utilisateur reçoit le message "Événement complet"
     Et le nombre de réservations actives ne dépasse jamais la capacité
 
+  Scénario: Une demande dont l'échéance est dépassée ne bloque pas la dernière place
+    Étant donné un événement avec 1 place, occupée par une demande en attente dont l'échéance est dépassée (même si la mise à jour automatique n'a pas encore eu lieu)
+    Quand je demande une place
+    Alors ma demande est acceptée avec le statut "En attente"
+
   Scénario: Déjà une demande ou une réservation active
     Étant donné que j'ai une réservation en attente ou confirmée pour cet événement
     Quand je tente de demander une place à nouveau
     Alors la demande est refusée avec le message "Vous avez déjà une demande en cours ou une réservation pour cet événement"
+    Et aucune seconde réservation n'est créée
+
+  Scénario: Double clic sur "Demander une place"
+    Quand je clique deux fois de suite, très vite, sur "Demander une place"
+    Alors une seule demande est créée
+    Et aucun message d'erreur ne s'affiche
+    Et l'écran montre ma demande en attente
 
   Scénario: Nouvelle demande après un refus, une expiration ou une annulation
     Étant donné que ma précédente réservation pour un événement réservable est refusée, expirée ou annulée
     Quand je demande une place à nouveau
     Alors une nouvelle réservation "En attente" est créée
 
+  Scénario: Nouvelle demande après plusieurs refus
+    Étant donné que l'administrateur a déjà refusé deux de mes demandes pour cet événement réservable
+    Quand je demande une place une troisième fois
+    Alors une nouvelle réservation "En attente" est créée
+    Et aucune limite du nombre de demandes ne m'est opposée
+
   Scénario: Événement déjà commencé ou passé
     Étant donné un événement dont l'heure de début est dépassée
     Quand je tente de demander une place
     Alors la demande est refusée avec le message "Les réservations sont closes"
 
-  Scénario: Événement non publié ou annulé
-    Quand je tente de demander une place pour un événement en brouillon ou annulé
-    Alors la demande est refusée
+  Scénario: Événement en brouillon ou inexistant
+    Quand je tente de demander une place pour un événement en brouillon ou inexistant
+    Alors la demande est refusée comme pour un contenu introuvable
     Et aucune place n'est occupée
+
+  Scénario: Événement annulé
+    Quand je tente de demander une place pour un événement annulé
+    Alors la demande est refusée avec le message "Cet événement a été annulé."
+    Et aucune place n'est occupée
+
+  Scénario: Un administrateur demande une place pour lui-même
+    Étant donné que je suis connecté en tant qu'administrateur
+    Et un événement réservable
+    Quand je demande une place
+    Alors ma réservation est créée avec le statut "En attente", comme pour un utilisateur
+    Et elle apparaît dans la liste des demandes à traiter comme les autres
 ```
 
-#### US-D2 — Suivre mes réservations *(modifiée : nouveaux statuts)*
+#### US-D2 — Suivre mes réservations *(modifiée : nouveaux statuts ; v5 : historique, événement indisponible)*
 > En tant qu'**utilisateur**, je veux **voir mes demandes et réservations avec leur statut** afin de **savoir où j'en suis**.
 
 ```gherkin
@@ -403,13 +463,23 @@ Fonctionnalité: Mes réservations
   Scénario: Liste de mes réservations
     Étant donné que j'ai 1 demande en attente, 1 réservation confirmée à venir, 1 passée et 1 refusée
     Quand j'ouvre "Mes réservations"
-    Alors je vois d'abord les réservations à venir (en attente et confirmées), de la plus proche à la plus lointaine
-    Et je vois ensuite les réservations passées, refusées, expirées et annulées
-    Et chaque ligne affiche son statut en clair
+    Alors je vois d'abord la section "À venir" avec les réservations en attente et confirmées, de la plus proche à la plus lointaine
+    Et je vois ensuite la section "Historique" avec les réservations passées, refusées, expirées et annulées
+    Et chaque ligne affiche son statut en clair ("En attente de confirmation", "Confirmée", "Refusée", "Expirée", "Annulée par vous", "Annulée par l'association")
+
+  Scénario: Réservation confirmée d'un événement terminé
+    Étant donné une réservation confirmée pour un événement dont l'heure de fin est dépassée
+    Quand j'ouvre "Mes réservations"
+    Alors elle apparaît dans la section "Historique" avec le statut "Confirmée" et la mention "Terminé"
 
   Scénario: Demande en attente
     Quand j'ouvre une demande en attente dans "Mes réservations"
     Alors je vois sa date limite de traitement et le numéro de l'administrateur à contacter
+
+  Scénario: Demande dont l'échéance est dépassée
+    Étant donné une demande en attente dont l'échéance est dépassée, même si la mise à jour automatique n'a pas encore eu lieu
+    Quand j'ouvre "Mes réservations"
+    Alors elle apparaît "Expirée" dans la section "Historique"
 
   Scénario: Demande refusée avec un motif
     Étant donné que l'admin a refusé ma demande avec le motif "Réservé aux adhérents"
@@ -426,6 +496,12 @@ Fonctionnalité: Mes réservations
     Quand j'ouvre "Mes réservations"
     Alors ma réservation apparaît avec le statut "Annulée par l'association"
 
+  Scénario: Événement repassé en brouillon
+    Étant donné une réservation finale (refusée, expirée ou annulée) pour un événement que l'admin a remis en brouillon
+    Quand j'ouvre "Mes réservations"
+    Alors la réservation reste dans mon historique
+    Et le titre de l'événement n'est pas un lien et indique "Événement indisponible"
+
   Scénario: Je ne vois que mes propres réservations
     Étant donné qu'un autre utilisateur a des réservations
     Quand j'ouvre "Mes réservations"
@@ -436,7 +512,7 @@ Fonctionnalité: Mes réservations
     Alors un message m'invite à consulter les événements à venir
 ```
 
-#### US-D3 — Annuler ma demande ou ma réservation *(modifiée)*
+#### US-D3 — Annuler ma demande ou ma réservation *(modifiée ; v5 : début actuel, statut changé entre-temps)*
 > En tant qu'**utilisateur**, je veux **annuler ma demande ou ma réservation** afin de **libérer la place si je ne peux pas venir**.
 
 ```gherkin
@@ -457,13 +533,20 @@ Fonctionnalité: Annulation par l'utilisateur
   Scénario: Délai d'annulation dépassé pour une réservation confirmée
     Étant donné que j'ai une réservation confirmée pour un événement qui commence dans 10 heures
     Quand je tente d'annuler
-    Alors l'annulation est refusée
+    Alors l'annulation est refusée avec le message "Le délai d'annulation est dépassé : contactez l'association"
     Et le numéro de l'administrateur m'est affiché pour le prévenir
 
   Scénario: Limite exacte du délai
     Étant donné une réservation confirmée pour un événement qui commence dans exactement 24 heures
     Quand j'annule ma réservation
     Alors l'annulation est acceptée
+
+  Scénario: Délai compté depuis le début actuel après un changement de date
+    Étant donné une réservation confirmée pour un événement prévu dans 3 jours
+    Et que l'admin avance l'événement pour qu'il commence dans 10 heures
+    Quand je tente d'annuler
+    Alors l'annulation est refusée car le délai de 24 heures se compte depuis le nouveau début
+    Et si l'admin repousse ensuite l'événement à dans 3 jours, l'annulation redevient possible
 
   Scénario: Réservation déjà payée
     Étant donné une réservation confirmée et marquée "Payée"
@@ -475,13 +558,22 @@ Fonctionnalité: Annulation par l'utilisateur
     Étant donné que ma réservation est refusée, expirée ou déjà annulée
     Quand je tente de l'annuler
     Alors rien ne change et aucune place n'est libérée une deuxième fois
+    Et un message m'indique que la demande a déjà été traitée ou annulée, et l'écran affiche son statut actuel
+
+  Scénario: Demande devenue expirée ou traitée entre-temps
+    Étant donné que j'ai ouvert l'écran avec une demande en attente
+    Et que, pendant ce temps, elle a expiré ou a été confirmée ou refusée par l'admin
+    Quand je clique sur "Annuler ma demande"
+    Alors l'annulation n'est pas appliquée à la place du nouveau statut
+    Et un message m'indique que la demande a déjà été traitée ou annulée
+    Et l'écran affiche le statut actuel
 
   Scénario: Réservation d'un autre utilisateur
     Quand je tente d'annuler la réservation d'un autre utilisateur
-    Alors l'action est refusée
+    Alors l'action est refusée comme pour un contenu introuvable (je ne sais pas si elle existe)
 ```
 
-#### US-D4 — Voir le numéro de l'administrateur à contacter *(nouvelle)*
+#### US-D4 — Voir le numéro de l'administrateur à contacter *(nouvelle ; v5 : lu à chaque affichage)*
 > En tant qu'**utilisateur ayant fait une demande**, je veux **voir le numéro de téléphone ou WhatsApp de l'administrateur** afin de **le contacter pour faire confirmer ma place**.
 
 ```gherkin
@@ -492,6 +584,12 @@ Fonctionnalité: Contact de l'administrateur
     Quand je viens de demander une place
     Alors je vois le numéro "+216 20 123 456"
     Et je peux appeler ce numéro ou ouvrir une conversation WhatsApp en un geste depuis mon téléphone
+
+  Scénario: Numéro affiché sur le détail de l'événement et dans "Mes réservations"
+    Étant donné que j'ai une demande en attente
+    Quand j'ouvre le détail de l'événement ou "Mes réservations"
+    Alors le numéro de contact est affiché dans les deux écrans
+    Et c'est toujours le numéro configuré à cet instant (jamais une copie ancienne)
 
   Scénario: Numéro uniquement téléphonique
     Étant donné que le numéro de contact est configuré sans WhatsApp
@@ -510,7 +608,7 @@ Fonctionnalité: Contact de l'administrateur
     Et un message m'indique que l'association n'a pas communiqué de numéro pour le moment
 ```
 
-#### US-D5 — Expiration automatique des demandes *(nouvelle)*
+#### US-D5 — Expiration automatique des demandes *(nouvelle ; v5 : recalcul de l'échéance, statut juste avant la mise à jour)*
 > En tant qu'**utilisateur qui cherche une place**, je veux **que les demandes non traitées expirent** afin que **les places ne restent pas bloquées indéfiniment**.
 
 ```gherkin
@@ -543,6 +641,28 @@ Fonctionnalité: Expiration des demandes
     Étant donné une demande dont l'échéance est dépassée
     Quand un visiteur consulte l'événement
     Alors cette demande n'est plus comptée dans les places occupées
+
+  Scénario: Échéance ramenée quand l'admin avance la date de l'événement
+    Étant donné une demande en attente créée le 10 mars à 10 h (échéance le 12 mars à 10 h) pour un événement le 20 mars
+    Quand l'admin avance l'événement au 11 mars à 9 h
+    Alors l'échéance de la demande devient le 11 mars à 9 h
+
+  Scénario: Échéance allongée quand l'admin repousse la date, sans dépasser 48 h après la demande
+    Étant donné une demande en attente créée le 10 mars à 10 h, dont l'échéance est le 11 mars à 9 h parce que l'événement commence à ce moment-là
+    Quand l'admin repousse l'événement au 20 mars
+    Alors l'échéance devient le 12 mars à 10 h (48 h après la demande, jamais plus)
+
+  Scénario: Une demande déjà échue n'est pas ranimée par un changement de date
+    Étant donné une demande dont l'échéance est dépassée
+    Quand l'admin repousse la date de l'événement
+    Alors la demande reste "Expirée"
+    Et l'utilisateur doit faire une nouvelle demande
+
+  Scénario: Redemander sans attendre la mise à jour automatique
+    Étant donné que ma demande en attente est échue mais pas encore marquée "Expirée" en base
+    Quand je demande une place à nouveau
+    Alors ma nouvelle demande est acceptée si une place est libre
+    Et mon ancienne demande apparaît "Expirée"
 ```
 
 ### Épique E — Administration
@@ -595,7 +715,7 @@ Fonctionnalité: Gestion des actualités
     Alors elle n'est pas enregistrée et le champ manquant est signalé
 ```
 
-#### US-E2 — Gérer les événements *(modifiée : prix, capacité ; v4 : événement commencé, limites de saisie, lieu, suppression d'un brouillon)*
+#### US-E2 — Gérer les événements *(modifiée : prix, capacité ; v4 : événement commencé, limites de saisie, lieu, suppression d'un brouillon ; v5 : recalcul des échéances)*
 > En tant qu'**administrateur**, je veux **créer, modifier, publier, dépublier et supprimer un brouillon d'événement** afin de **proposer des activités aux membres**.
 
 ```gherkin
@@ -664,6 +784,7 @@ Fonctionnalité: Gestion des événements
     Quand je modifie sa date, son heure ou son prix
     Alors un avertissement me rappelle de prévenir les inscrits
     Et après confirmation, la modification est enregistrée et les réservations sont conservées
+    Et, si la date de début change, l'échéance des demandes en attente est recalculée (R30, voir US-D5)
 
   Scénario: Changer uniquement le lieu d'un événement avec des inscrits
     Étant donné un événement avec des réservations actives
@@ -750,11 +871,14 @@ Fonctionnalité: Annulation et suppression d'un événement
 
 Note v4 : un brouillon jamais publié est déjà supprimable depuis l'étape 2 (US-E2). Le scénario « Supprimer un événement sans aucune réservation » ci-dessus (étape 7) étend la suppression aux événements publiés qui n'ont jamais eu de réservation.
 
-#### US-E4 — Voir les inscrits et les demandes d'un événement *(modifiée)*
+#### US-E4 — Voir les inscrits et les demandes d'un événement *(modifiée ; v5 : tri, coordonnées, compte supprimé)*
 > En tant qu'**administrateur**, je veux **voir les demandes et les inscrits d'un événement** afin de **traiter les demandes, préparer l'accueil et prévenir les participants**.
 
 ```gherkin
 Fonctionnalité: Liste des inscrits
+
+  Contexte:
+    Étant donné que je suis connecté en tant qu'administrateur
 
   Scénario: Liste par statut
     Étant donné un événement de 30 places avec 3 demandes en attente, 12 réservations confirmées et 2 refusées
@@ -765,12 +889,39 @@ Fonctionnalité: Liste des inscrits
     Et je vois le total "15 / 30 places occupées (12 confirmées, 3 en attente)"
     Et les réservations refusées, expirées et annulées sont affichées à part
 
+  Scénario: Ordre des confirmées et des autres réservations
+    Étant donné des réservations confirmées au nom de "Ben Salah Amine", "Ben Ali Zied" et "Ben Ali Amel"
+    Et 3 réservations refusées, expirées ou annulées à des dates différentes
+    Quand j'ouvre la liste des inscrits
+    Alors les confirmées sont triées par nom puis prénom : "Ben Ali Amel", "Ben Ali Zied", "Ben Salah Amine"
+    Et les autres réservations sont affichées à part, la plus récente d'abord
+
+  Scénario: Demande dont l'échéance est dépassée
+    Étant donné une demande en attente dont l'échéance est dépassée, même si la mise à jour automatique n'a pas encore eu lieu
+    Quand j'ouvre la liste des inscrits
+    Alors elle apparaît "Expirée" dans les autres réservations
+    Et elle n'est pas comptée dans les places occupées
+    Et je ne peux plus la confirmer
+
+  Scénario: Compte supprimé
+    Étant donné une réservation dont l'utilisateur a supprimé son compte
+    Quand j'ouvre la liste des inscrits
+    Alors la ligne affiche "Compte supprimé" sans prénom, nom, téléphone ni e-mail
+
   Scénario: Aucun inscrit
     Quand j'ouvre la liste des inscrits d'un événement sans réservation
     Alors un message indique "Aucune demande pour le moment"
+
+  Scénario: Coordonnées réservées aux administrateurs
+    Étant donné que je suis visiteur ou simple utilisateur
+    Quand je tente d'ouvrir la liste des inscrits d'un événement
+    Alors l'accès est refusé
+    Et aucun nom, téléphone ni e-mail d'un autre utilisateur n'est affiché nulle part pour moi
 ```
 
-#### US-E5 — Annuler la réservation d'un utilisateur *(modifiée)*
+La liste n'est pas paginée au MVP (P-R7) : le volume d'une petite association le permet.
+
+#### US-E5 — Annuler la réservation d'un utilisateur *(modifiée ; v5 : statut changé entre-temps)*
 > En tant qu'**administrateur**, je veux **annuler la demande ou la réservation d'un utilisateur** afin de **traiter un désistement reçu par téléphone, même après le délai**.
 
 ```gherkin
@@ -782,18 +933,32 @@ Fonctionnalité: Annulation par un administrateur
     Alors son statut devient "Annulée par l'association"
     Et la place est libérée
 
+  Scénario: Annulation d'une demande en attente
+    Étant donné une demande en attente
+    Quand je l'annule depuis la liste des inscrits
+    Alors son statut devient "Annulée par l'association"
+    Et la place est libérée
+
   Scénario: Annulation d'une réservation payée
     Étant donné une réservation confirmée et marquée "Payée"
     Quand je l'annule
     Alors elle reste marquée "Payée" pour le suivi d'un remboursement hors application
 
+  Scénario: Réservation qui a changé de statut entre-temps
+    Étant donné une réservation que l'utilisateur vient d'annuler lui-même, ou qui vient d'expirer
+    Quand je tente de l'annuler depuis une liste affichée avant ce changement
+    Alors l'action est refusée avec le message "Cette demande a déjà été traitée ou annulée."
+    Et la liste se met à jour avec le statut actuel
+    Et aucune place n'est libérée une deuxième fois
+
   Scénario: Événement terminé
     Étant donné un événement terminé
     Quand je consulte sa liste des inscrits
     Alors je ne peux plus annuler de réservation
+    Et un message indique que l'événement est terminé
 ```
 
-#### US-E6 — Confirmer ou refuser une demande *(nouvelle)*
+#### US-E6 — Confirmer ou refuser une demande *(nouvelle ; v5 : motif limité, deux admins en même temps)*
 > En tant qu'**administrateur**, je veux **confirmer ou refuser une demande en attente** afin de **valider les places après avoir échangé avec la personne**.
 
 ```gherkin
@@ -820,11 +985,23 @@ Fonctionnalité: Traitement des demandes
     Quand je refuse une demande sans saisir de motif
     Alors le refus est accepté
 
+  Scénario: Motif trop long
+    Quand je refuse une demande avec un motif de 501 caractères
+    Alors le refus n'est pas enregistré et l'erreur est expliquée (500 caractères au plus)
+    Et un motif de 500 caractères est accepté
+
   Scénario: Demande qui n'est plus en attente
     Étant donné une demande expirée, annulée par l'utilisateur ou déjà traitée par un autre admin
     Quand je tente de la confirmer ou de la refuser
     Alors l'action est refusée
     Et la liste se met à jour avec le statut actuel
+    Et le message est "Cette demande a déjà été traitée ou annulée." (ou, si elle a expiré, "Cette demande a expiré : le membre doit faire une nouvelle demande.")
+
+  Scénario: Deux administrateurs traitent la même demande en même temps
+    Étant donné une demande en attente affichée chez deux administrateurs
+    Quand l'un la confirme et l'autre la refuse au même instant
+    Alors une seule des deux actions est appliquée
+    Et l'autre administrateur reçoit le message "Cette demande a déjà été traitée ou annulée." avec le statut actuel
 
   Scénario: Événement commencé
     Étant donné un événement dont l'heure de début est dépassée
@@ -835,9 +1012,17 @@ Fonctionnalité: Traitement des demandes
     Quand j'ouvre l'espace d'administration
     Alors je vois le nombre total de demandes en attente, tous événements confondus
     Et celles dont l'échéance est la plus proche sont en tête
+    Et chaque ligne affiche le prénom, le nom, le téléphone, l'e-mail, l'événement et l'échéance
+
+  Scénario: Aucune demande à traiter
+    Étant donné qu'aucune demande n'est en attente
+    Quand j'ouvre la liste des demandes à traiter
+    Alors un message indique "Aucune demande à traiter."
 ```
 
-#### US-E7 — Marquer une réservation comme payée *(nouvelle)*
+L'application **n'enregistre pas** quel administrateur a confirmé ou refusé une demande (P-R6, minimisation des données) ; seule la mention « Payée » garde l'administrateur qui l'a posée (US-E7).
+
+#### US-E7 — Marquer une réservation comme payée *(nouvelle ; v5 : après la fin, annulée, gratuit)*
 > En tant qu'**administrateur**, je veux **indiquer qu'une personne a payé en main propre** afin de **savoir qui reste à encaisser**.
 
 ```gherkin
@@ -850,9 +1035,20 @@ Fonctionnalité: Suivi du paiement
     Étant donné une réservation confirmée pour un événement à 15 TND
     Quand je la marque "Payée"
     Alors elle affiche "Payée" avec la date et le nom de l'admin qui l'a enregistré
+    Et l'utilisateur voit "Payée" dans "Mes réservations"
+
+  Scénario: Marquer comme payée après la fin de l'événement
+    Étant donné une réservation confirmée pour un événement payant dont l'heure de fin est dépassée
+    Quand je la marque "Payée"
+    Alors la mention est enregistrée, sans limite de date
 
   Scénario: Corriger une erreur
     Étant donné une réservation marquée "Payée" par erreur
+    Quand je retire la mention
+    Alors elle redevient "Non payée"
+
+  Scénario: Retirer la mention sur une réservation annulée
+    Étant donné une réservation annulée qui avait été marquée "Payée" par erreur
     Quand je retire la mention
     Alors elle redevient "Non payée"
 
@@ -860,12 +1056,19 @@ Fonctionnalité: Suivi du paiement
     Étant donné une demande en attente
     Quand je tente de la marquer "Payée"
     Alors l'action est refusée
-    Et un message m'invite à confirmer d'abord la demande
+    Et un message m'invite à confirmer d'abord la demande ("Confirmez d'abord la demande avant de la marquer payée")
+
+  Scénario: Réservation annulée, refusée ou expirée
+    Étant donné une réservation refusée, expirée ou annulée qui n'est pas marquée "Payée"
+    Quand je tente de la marquer "Payée"
+    Alors l'action est refusée
+    Et seule une réservation confirmée peut recevoir la mention
 
   Scénario: Événement gratuit
     Étant donné une réservation confirmée pour un événement gratuit
     Quand j'affiche la réservation
     Alors l'action "Marquer comme payée" n'est pas proposée
+    Et si l'action est tentée quand même, elle est refusée avec le message "Cet événement est gratuit : aucun paiement à enregistrer"
 
   Scénario: Aucun paiement en ligne
     Quand un utilisateur consulte un événement payant
@@ -921,7 +1124,7 @@ Fonctionnalité: Numéro de contact
 
 Version minimale, sans analyse juridique : consentement, données minimales, suppression du compte. Autorité de contrôle : **INPDP** (Instance nationale de protection des données personnelles).
 
-#### US-F1 — Être informé et consentir *(modifiée : version de la politique, pas de contrôle d'âge)*
+#### US-F1 — Être informé et consentir *(modifiée : version de la politique, pas de contrôle d'âge ; v5 : visibilité par les admins)*
 > En tant que **visiteur**, je veux **savoir quelles données sont collectées et pourquoi** afin de **donner mon accord en connaissance de cause**.
 
 ```gherkin
@@ -932,6 +1135,12 @@ Fonctionnalité: Information et consentement
     Alors un lien "Politique de confidentialité" est accessible en pied de page
     Et elle indique les données collectées, leur usage, leur durée de conservation, le contact de l'association
     Et elle mentionne la loi organique n° 2004-63 et la possibilité de saisir l'INPDP
+
+  Scénario: Visibilité des coordonnées par les administrateurs
+    Quand je lis la politique de confidentialité
+    Alors elle indique que les administrateurs voient mon nom, mon prénom, mon téléphone et mon e-mail dès que je fais une demande de place
+    Et elle explique pourquoi (valider la demande, me joindre, préparer l'accueil, me prévenir d'un changement)
+    Et elle précise que les autres membres et les visiteurs ne voient jamais mes données
 
   Scénario: Consentement enregistré
     Quand je crée un compte en acceptant la politique
@@ -1008,16 +1217,16 @@ Fonctionnalité: Mon profil
 | R1 | Places par réservation | **1 place par réservation**, pas d'accompagnant *(défaut)*. |
 | R2 | Événement réservable | Publié, **non annulé**, **pas encore commencé**, et réservations actives (En attente + Confirmées) < capacité. |
 | R3 | Clôture des demandes | À l'**heure de début** de l'événement *(défaut)*. |
-| R4 | Unicité | **Une seule réservation active** (En attente ou Confirmée) par utilisateur et par événement. Après un refus, une expiration ou une annulation, on peut refaire une demande. |
-| R5 | Réservation en deux temps | La demande de l'utilisateur crée une réservation **En attente** qui **occupe une place**. Seul un admin la passe en **Confirmée** ou **Refusée** (motif facultatif). Cycle de vie complet : § 2. |
-| R6 | Expiration | Une demande En attente expire à l'échéance : **48 h après la demande, ou au début de l'événement si c'est plus tôt**. Elle passe en **Expirée** et la place est libérée. Une demande expirée ne peut plus être confirmée. |
-| R7 | Places restantes | **Capacité − (En attente + Confirmées)**, visible de tous *(défaut)*. |
+| R4 | Unicité | **Une seule réservation active** (En attente ou Confirmée) par utilisateur et par événement. Après un refus, une expiration ou une annulation, on peut refaire une demande (sans limite, R33). |
+| R5 | Réservation en deux temps | La demande de l'utilisateur crée une réservation **En attente** qui **occupe une place**. Seul un admin la passe en **Confirmée** ou **Refusée** (motif facultatif, 500 caractères au plus). Cycle de vie complet : § 2. |
+| R6 | Expiration | Une demande En attente expire à l'échéance : **48 h après la demande, ou au début de l'événement si c'est plus tôt**. Elle passe en **Expirée** et la place est libérée. Une demande expirée ne peut plus être confirmée. Une demande dont l'échéance est passée est **traitée comme expirée partout** (statut affiché, places, redemande possible) sans attendre la mise à jour automatique. L'échéance est recalculée si la date de l'événement change (R30). |
+| R7 | Places restantes | **Capacité − (En attente + Confirmées)**, visible de tous *(défaut)*. Les demandes En attente dont l'échéance est passée ne sont **pas** comptées. |
 | R8 | Contact de l'admin | **Un seul numéro de contact** pour toute l'association, configuré par un admin, avec l'indication « joignable sur WhatsApp » ou non *(défaut)*. **Un admin peut aussi le retirer** (plus aucun numéro n'est alors configuré et l'option WhatsApp est désactivée). Il est affiché à l'utilisateur après sa demande, sur ses demandes en attente et quand il ne peut plus annuler lui-même. Quand aucun numéro n'est configuré, un message indique à l'utilisateur que l'association n'a pas communiqué de numéro pour le moment *(défaut)*. Il n'est pas affiché aux visiteurs. |
-| R9 | Annulation par l'utilisateur | Demande **En attente** : possible jusqu'au début de l'événement. Réservation **Confirmée** : possible jusqu'à **24 h avant le début** (limite comprise) *(défaut J-1)*. La place est libérée immédiatement. |
+| R9 | Annulation par l'utilisateur | Demande **En attente** : possible jusqu'au début de l'événement. Réservation **Confirmée** : possible jusqu'à **24 h avant le début actuel** (limite comprise ; le début actuel tient compte d'un éventuel changement de date, R30) *(défaut J-1)*. La place est libérée immédiatement. |
 | R10 | Annulation par l'admin | Possible à tout moment **avant la fin** de l'événement, sur une réservation En attente ou Confirmée. Statut « Annulée par l'association ». |
 | R11 | Capacité | Nombre entier **de 1 à 10 000**. L'admin peut l'augmenter librement (dans cette limite). Il **ne peut pas la réduire sous le nombre de réservations actives** (En attente + Confirmées) : la modification est refusée avec un message *(défaut)*. |
 | R12 | Prix | **Facultatif**, en **dinars tunisiens (TND)**, de 0 à **99 999,999 TND**, jusqu'à 3 décimales (millimes). Vide ou 0 = **Gratuit**. Affiché « X TND, à régler sur place » : **sans décimales** si le prix est entier (« 15 TND »), **avec 3 décimales** sinon (« 12,500 TND »). Modifier la date, l'heure ou le prix d'un événement qui a des inscrits est permis après un avertissement ; les réservations sont conservées et l'association prévient elle-même les inscrits. **Changer uniquement le lieu ne déclenche pas d'avertissement.** |
-| R13 | Paiement | **Hors ligne uniquement**, aucun paiement en ligne. L'admin peut ajouter (et retirer en cas d'erreur) la mention **« Payée »** sur une réservation **Confirmée** d'un événement **payant**. La date et l'admin sont enregistrés. **Aucun remboursement n'est géré dans l'application** : la mention « Payée » reste visible sur une réservation annulée, pour le suivi. |
+| R13 | Paiement | **Hors ligne uniquement**, aucun paiement en ligne. L'admin peut ajouter la mention **« Payée »** sur une réservation **Confirmée** d'un événement **payant**, **à tout moment, y compris après la fin de l'événement**. Il peut la **retirer** en cas d'erreur, **même sur une réservation annulée**. La date et l'admin qui l'a posée sont enregistrés. **Aucun remboursement n'est géré dans l'application** : la mention « Payée » reste visible sur une réservation annulée, pour le suivi. Elle ne peut pas être posée sur une réservation non confirmée (en attente, refusée, expirée, annulée) ni sur un événement gratuit. |
 | R14 | Statuts d'un événement | Brouillon → Publié → (Annulé). On ne peut dépublier que s'il n'y a **aucune réservation active**. Un événement annulé est définitif, et toutes ses réservations actives passent en « Annulée par l'association ». |
 | R15 | Suppression d'un événement | Seulement s'il **n'a jamais eu de réservation**, quel qu'en soit le statut ; sinon on l'annule *(défaut)*. **Dès l'étape 2**, un admin peut supprimer (après confirmation) un **brouillon qui n'a jamais été publié** ; un événement qui a été publié, même dépublié depuis, ne peut pas être supprimé avant l'étape 7. |
 | R16 | Liste d'attente | Aucune au MVP *(défaut)*. |
@@ -1028,12 +1237,16 @@ Fonctionnalité: Mon profil
 | R21 | Mot de passe et connexion | Au moins **8 caractères**, dont une lettre et un chiffre *(défaut)*. Blocage **15 min après 5 échecs** *(défaut)*. Pas de vérification de l'e-mail au MVP *(défaut)*. |
 | R22 | Administrateurs | Pas d'inscription en tant qu'admin : le **premier admin est créé à l'installation**, les suivants sont désignés manuellement au MVP. Il doit toujours rester **au moins un admin**. |
 | R23 | Suppression de compte | Immédiate et définitive. Les réservations à venir (En attente ou Confirmées) sont **annulées** et leurs places libérées. Les autres réservations sont **rendues anonymes**. |
-| R24 | Protection des données | Cadre : **loi organique tunisienne n° 2004-63 du 27 juillet 2004**, autorité **INPDP**. Minimum retenu : consentement explicite à l'inscription, avec conservation de la date et de la **version de la politique acceptée** ; aucun contrôle d'âge dédié (le site est accessible à tout le monde) ; données minimales (R20) ; suppression du compte (R23) ; consultation de ses données (US-F3). |
+| R24 | Protection des données | Cadre : **loi organique tunisienne n° 2004-63 du 27 juillet 2004**, autorité **INPDP**. Minimum retenu : consentement explicite à l'inscription, avec conservation de la date et de la **version de la politique acceptée** ; aucun contrôle d'âge dédié (le site est accessible à tout le monde) ; données minimales (R20) ; suppression du compte (R23) ; consultation de ses données (US-F3) ; information sur la visibilité des coordonnées par les administrateurs (R32). |
 | R25 | Conservation des données | Un compte inactif depuis **3 ans** (mesuré avec la date de dernière connexion, ou à défaut la date de création) est à supprimer *(défaut ; traitement manuel ou plus tard)*. |
 | R26 | Heure de référence | Toutes les dates et heures sont en **heure de Tunis (Africa/Tunis, UTC+1, sans changement d'heure)**. |
 | R27 | Langue | Application **en français uniquement**. |
 | R28 | Modification d'un événement | Un admin peut modifier un événement (brouillon ou publié) tant qu'il n'est **ni terminé ni annulé**, **y compris s'il a déjà commencé**. Sur un événement commencé, la date de début **ne peut pas être déplacée dans le passé** (une date de début inchangée reste acceptée). Un événement **terminé** (heure de fin dépassée) ou **annulé** ne peut plus être modifié. La date de fin d'un événement commencé ne peut pas être placée dans le passé *(défaut, voir Q28)*. |
 | R29 | Limites de saisie des textes | **Titre** et **lieu** : 200 caractères au plus. **Description** : 4 000 caractères au plus. Titre, lieu et description sont obligatoires. Les limites de capacité et de prix sont en R11 et R12. |
+| R30 | Recalcul de l'échéance *(v5, QF-2)* | Quand un admin **change la date de début** d'un événement, l'échéance de chaque demande En attente **non échue** est recalculée avec la formule de R6 à partir du **nouveau début** : **ramenée** au nouveau début s'il est plus tôt ; **allongée** s'il est plus tard, **sans jamais dépasser 48 h après la demande**. Une demande **déjà échue n'est jamais ranimée**. Le délai d'annulation de 24 h (R9) se compte depuis le début **actuel**. Les réservations sont conservées (R12). |
+| R31 | Administrateur et réservation *(v5, QF-1)* | Un administrateur a aussi les droits d'un utilisateur : il peut **demander une place pour lui-même**, selon le même parcours (demande, confirmation par un admin, expiration, annulation). Aucun traitement spécial : sa demande apparaît dans les demandes à traiter comme les autres. |
+| R32 | Visibilité des coordonnées *(v5, QF-9)* | Les administrateurs voient **prénom, nom, téléphone et e-mail** des personnes ayant fait une demande, dans la liste des demandes à traiter et dans la liste des inscrits, pour traiter les demandes, les joindre, préparer l'accueil et prévenir en cas d'annulation. Ces données ne sont visibles ni des autres utilisateurs ni des visiteurs. Si le compte a été supprimé, la ligne affiche « Compte supprimé ». La politique de confidentialité le mentionne (version 1.1). |
+| R33 | Nouvelles demandes après refus *(v5, QF-10)* | **Aucune limite** du nombre de nouvelles demandes d'un utilisateur après un refus, une expiration ou une annulation : seul le fait d'avoir déjà une réservation active (R4) bloque. L'admin peut refuser à nouveau. |
 
 ### Points à signaler à l'agent `architecte` (décisions techniques, hors de mon rôle)
 - Garantir qu'on ne dépasse **jamais** la capacité quand deux personnes demandent la dernière place en même temps (US-D1).
@@ -1048,6 +1261,8 @@ Fonctionnalité: Mon profil
 - **(v4) Retrait du numéro de contact** (R8, US-E8) : prévoir l'opération « retirer » (le plan d'étape 2 n'enregistre qu'un numéro valide) et la remise de l'option WhatsApp à « non ».
 - **(v4) Suppression d'un brouillon jamais publié** (R15, US-E2) : il faut pouvoir savoir qu'un événement **a déjà été publié**, même après dépublication (la date de publication est aujourd'hui remise à vide à la dépublication) ; prévoir aussi le point d'entrée de suppression.
 - **(v4) Événement terminé** : le détail public doit permettre d'indiquer « terminé » (la liste publique du plan ne l'expose pas, voir le récapitulatif).
+- **(v5) Codes d'erreur** : le plan des réservations (§ 7) emploie `event_cancelled` et `event_ended`, absents de la liste des codes du § 4 du plan ; les libellés correspondants sont proposés dans `libelles-ecrans.md` § 11. Le plan prévoit aussi un message côté membre pour `reservation_state_changed` qui n'existe pas dans sa liste de messages (proposition en § 11 des libellés).
+- **(v5) Réservation « courante » d'un membre** : « À venir » = demande en attente ou confirmée dont l'événement **n'est pas terminé** (un événement en cours reste donc « À venir » jusqu'à sa fin) ; le plan (QF-7) ne le précise que pour les événements terminés. À confirmer avec la définition de `IsCurrentForMember`.
 
 ---
 
@@ -1092,6 +1307,25 @@ Réponses du porteur ou valeur par défaut du plan d'architecte retenue. La colo
 
 Les points E2-10 (type du prix `decimal(9,3)`) et E2-11 (abandon de l'objet valeur `Money`) sont des choix **techniques** : ils relèvent de l'architecte (ADR 0010) et ne figurent pas ici. E2-12 est traitée avec Q17.
 
+### Questions de la tranche « Réservations » (plan `technique/plan-reservations.md` § 15.1, QF-1 à QF-10) — toutes résolues en v5
+
+Le porteur a accepté la valeur par défaut du plan pour chacune.
+
+| # | Question | Décision | Origine | Où |
+|---|---|---|---|---|
+| QF-1 | Un **administrateur** peut-il demander une place pour lui-même ? | **Oui**, même parcours qu'un utilisateur. | Défaut du plan, accepté | R31, US-D1 |
+| QF-2 | L'**échéance** suit-elle un changement de date de l'événement ? | **Oui** : ramenée au nouveau début s'il est plus tôt ; allongée s'il est plus tard, sans dépasser 48 h après la demande ; demande échue jamais ranimée. Le délai de 24 h d'annulation se compte depuis le début **actuel**. | Défaut du plan, accepté | R30, R6, R9, US-D3, US-D5, US-E2 |
+| QF-3 | Que voit un membre dont la **dernière demande** est refusée, expirée ou annulée ? | Une ligne d'information (avec le motif en cas de refus) et le bouton « Demander une place » **si l'événement est réservable**. | Défaut du plan, accepté | US-C2 |
+| QF-4 | La mention « Payée » peut-elle être posée **après la fin** de l'événement ? | **Oui**, sans limite de date. | Défaut du plan, accepté | R13, US-E7 |
+| QF-5 | La mention « Payée » peut-elle être **retirée sur une réservation annulée** ? | **Oui** ; elle ne peut être **posée** que sur une Confirmée d'un événement payant. | Défaut du plan, accepté | R13, US-E7 |
+| QF-6 | **Ordre** de la liste des inscrits ? | Confirmées par **nom puis prénom** ; en attente de la plus ancienne à la plus récente ; autres, la plus récente d'abord. | Défaut du plan, accepté | US-E4 |
+| QF-7 | Une réservation **confirmée d'un événement terminé** est-elle « passée » ? | **Oui** : section « Historique » avec le statut « Confirmée » et la mention « Terminé ». | Défaut du plan, accepté | US-D2 |
+| QF-8 | **Libellés** à valider (statuts, messages d'erreur, titres des écrans) ? | Validés tels que proposés par le plan ; rédigés dans `libelles-ecrans.md` (v1.1). | Défaut du plan, accepté | `libelles-ecrans.md` |
+| QF-9 | La **politique de confidentialité** doit-elle dire que les admins voient les coordonnées des inscrits ? | **Oui** ; version portée à 1.1-provisoire. | Défaut du plan, accepté | R32, US-F1, `politique-confidentialite.md` |
+| QF-10 | Faut-il **limiter les redemandes** après un refus ? | **Non** (RG-03 l'autorise) ; l'admin refuse à nouveau. | Défaut du plan, accepté | R33, US-D1 |
+
+Les décisions **P-R1 à P-R8** du plan sont acceptées : voir l'encadré « version 5 » en haut de ce document pour celles qui ont un effet fonctionnel.
+
 Questions restées ouvertes à la suite des décisions v4 :
 
 | # | Question | Valeur par défaut en attendant |
@@ -1134,6 +1368,7 @@ Si le temps manque, ces éléments peuvent passer en « plus tard » sans casser
 - Purge automatique des comptes inactifs, statistiques de fréquentation.
 - Événements réservés aux adhérents.
 - Redemander l'accord quand la politique de confidentialité change (Q16).
+- Délais de 48 h et de 24 h modifiables depuis l'interface (aujourd'hui en configuration, P-R4) ; pagination de la liste des inscrits (P-R7).
 
 ### Ordre de réalisation conseillé
 
@@ -1150,3 +1385,5 @@ L'idée : construire d'abord le **cœur métier testable** (la réservation, son
 9. **Protection des données** : US-F1, US-F2, US-F3, et US-A3.
 
 Les étapes 1 à 9 côté API correspondent à la semaine 1, avec les tests tirés des scénarios ci-dessus (le tableau des transitions du § 2 donne une liste de cas à tester). La semaine 2 reprend le même ordre pour les écrans Angular et l'espace admin.
+
+Note v5 : le plan `technique/plan-reservations.md` regroupe ces étapes en tranches : **A** (demander, suivre, annuler : US-D1 à D4, partie membre de US-C2), **B** (traiter : US-E4 à E7, US-D5 « expirée ne se confirme plus »), **C** (expiration automatique en arrière-plan, US-D5). Les scénarios de recalcul de l'échéance (US-D5) relèvent de la tranche A.

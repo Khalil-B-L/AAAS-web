@@ -64,6 +64,9 @@
                   <div class="muted small">
                     {{ event.pendingCount }} en attente, {{ event.confirmedCount }} confirmées
                   </div>
+                  <a class="small" [routerLink]="[event.id, 'inscrits']" [attr.aria-label]="'Inscrits — ' + event.title"
+                    >Inscrits</a
+                  >
                 </td>
                 <td>{{ event.price | tndPrice }}</td>
               </tr>

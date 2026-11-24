@@ -1,6 +1,6 @@
 # ADR 0018 — Réservation : modèle de données, statuts, transitions et erreurs
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 24/11/2026)
 - **Date** : 24/11/2026
 - **Mise en œuvre** : tranche « Réservations » (`docs/technique/plan-reservations.md`, tâches A et B)
 - **Références** : cahier § 4.2, § 5.1, RG-01 à RG-05, RG-08, RG-12 ; mvp § 2, US-D1 à D5, US-E4 à E7, R1, R4 à R10, R13 ; ADR 0003, 0004, 0005, 0006, 0007, 0012

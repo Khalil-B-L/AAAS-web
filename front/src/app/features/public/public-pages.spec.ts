@@ -1,12 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
-import { problem, query, text } from '../../../testing/dom';
+import { buttonByText, problem, query, text } from '../../../testing/dom';
 import { memberToken } from '../../../testing/fake-jwt';
 import { EventsApi } from '../../core/api/events.api';
+import { ReservationsApi } from '../../core/api/reservations.api';
+import { SettingsApi } from '../../core/api/settings.api';
 import { FORMATTING_PROVIDERS } from '../../core/config/formatting.providers';
 import { AuthService } from '../../core/auth/auth.service';
-import { EventDetailDto, PagedResult, EventSummaryDto } from '../../core/models/api-models';
+import { EventDetailDto, MyReservationDto, PagedResult, EventSummaryDto } from '../../core/models/api-models';
 import { EventDetail } from './event-detail/event-detail';
 import { EventList } from './event-list/event-list';
 
@@ -38,12 +40,29 @@ function page(items: EventSummaryDto[], totalCount = items.length, pageNumber = 
 
 describe('pages publiques', () => {
   let api: { list: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> };
+  let reservations: { forEvent: ReturnType<typeof vi.fn>; request: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     localStorage.clear();
     api = { list: vi.fn(), get: vi.fn() };
+    // Panneau « Ma réservation » : aucune demande (204 → null).
+    reservations = { forEvent: vi.fn(() => of(null)), request: vi.fn(), cancel: vi.fn() };
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), ...FORMATTING_PROVIDERS, { provide: EventsApi, useValue: api }],
+      providers: [
+        provideRouter([]),
+        ...FORMATTING_PROVIDERS,
+        { provide: EventsApi, useValue: api },
+        { provide: ReservationsApi, useValue: reservations },
+        // Carte de contact affichée sous une demande en attente.
+        {
+          provide: SettingsApi,
+          useValue: {
+            getContact: vi.fn(() =>
+              of({ phoneNumber: '+21620123456', whatsApp: false, isConfigured: true, version: 'v', updatedAt: null }),
+            ),
+          },
+        },
+      ],
     });
   });
 
@@ -123,11 +142,53 @@ describe('pages publiques', () => {
       expect(link.getAttribute('href')).toBe(`/connexion?returnUrl=%2Fevenements%2F${GUID}`);
     });
 
-    it('masque le bouton pour un membre connecté (UX-9)', async () => {
+    it('UX-9 levé : un membre connecté sans demande voit le bouton « Demander une place » (pas un lien de connexion)', async () => {
       TestBed.inject(AuthService).startSession(memberToken());
       api.get.mockReturnValue(of(summary()));
       const fixture = await render();
-      expect(text(fixture)).not.toContain('Demander une place');
+      expect(fixture.nativeElement.querySelector('a[href^="/connexion"]')).toBeNull();
+      expect(text(fixture)).toContain('Demander une place');
+    });
+
+    it('après une demande : le détail est relu (places), « ma demande » n’est PAS relue ni remise en chargement', async () => {
+      TestBed.inject(AuthService).startSession(memberToken());
+      api.get.mockReturnValueOnce(of(summary())).mockReturnValueOnce(of(summary({ remainingSeats: 7 })));
+      const created: MyReservationDto = {
+        id: 'r-1',
+        status: 'Pending',
+        requestedAt: '2026-12-01T09:00:00+00:00',
+        expiresAt: '2026-12-03T09:00:00+00:00',
+        decidedAt: null,
+        refusalReason: null,
+        cancelledAt: null,
+        isPaid: false,
+        paidAt: null,
+        canCancel: true,
+        cancellableUntil: null,
+        event: {
+          id: GUID,
+          title: 'Atelier couture',
+          location: 'Tunis',
+          startsAt: '2026-12-05T09:00:00+00:00',
+          endsAt: '2026-12-05T11:00:00+00:00',
+          price: null,
+          status: 'Published',
+          hasStarted: false,
+          hasEnded: false,
+          isVisible: true,
+        },
+      };
+      reservations.request.mockReturnValue(of(created));
+      const fixture = await render();
+      expect(reservations.forEvent).toHaveBeenCalledTimes(1);
+
+      buttonByText(fixture, 'Demander une place').click();
+      await fixture.whenStable();
+
+      expect(api.get).toHaveBeenCalledTimes(2);
+      expect(text(fixture)).toContain('7 places restantes');
+      expect(reservations.forEvent).toHaveBeenCalledTimes(1);
+      expect(text(fixture)).toContain('Demande en attente de confirmation');
     });
 
     it('signale un événement terminé, sans bouton', async () => {

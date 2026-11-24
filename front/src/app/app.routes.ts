@@ -35,6 +35,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/account/my-account/my-account').then((m) => m.MyAccount),
   },
   {
+    path: 'mes-reservations',
+    title: 'Mes réservations',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/reservations/my-reservations/my-reservations').then((m) => m.MyReservations),
+  },
+  {
     path: 'confidentialite',
     title: 'Politique de confidentialité',
     loadComponent: () => import('./features/public/privacy/privacy').then((m) => m.Privacy),

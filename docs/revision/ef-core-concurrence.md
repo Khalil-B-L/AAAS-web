@@ -28,7 +28,7 @@
 - **RCSI** (READ_COMMITTED_SNAPSHOT, par défaut sur Azure SQL) : les lectures lisent une version validée sans verrou ; mais un `SELECT` **avec `UPDLOCK`** est une lecture verrouillante qui lit la dernière version validée. Le verrou fonctionne donc aussi sous RCSI (les tests d'intégration activent RCSI).
 - **EF Core** : `db.Events.FromSql($"SELECT * FROM [Events] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {id}")`. L'interpolation `{id}` devient un **paramètre SQL** (`FromSql` prend un `FormattableString`) : pas d'injection. Ne jamais utiliser `FromSqlRaw` avec une concaténation.
 - **Piège** : EF compose la requête brute en **sous-requête** (`SELECT TOP(2) [e].* FROM (SELECT * ... WITH (UPDLOCK, ROWLOCK) ...) AS [e]` pour `SingleOrDefault`). SQL Server accepte les indicateurs dans une table dérivée. Vérification sans base : `query.ToQueryString()` (test `EventLockSqlTests`).
-- **Projet** : `IEventLock` (Application) / `EventLock` (Infrastructure). Utilisé par la modification et la dépublication ; plus tard par la demande de place (étape 4) et l'annulation (étape 7).
+- **Projet** : `IEventLock` (Application) / `EventLock` (Infrastructure). Utilisé par la modification, la dépublication et, depuis la tranche Réservations, **la demande de place** ; plus tard par l'annulation d'un événement (étape 7). Isolation, index filtré et test déterministe du verrou : fiche [`sql-server-verrous-isolation.md`](sql-server-verrous-isolation.md).
 
 ## 3. Transaction manuelle + stratégie de reprise
 
@@ -94,8 +94,27 @@
 ## 8. EF Core dans la couche Application
 
 - Application référence `Microsoft.EntityFrameworkCore` (DbSet, LINQ, `DbUpdateConcurrencyException`) mais **pas** `SqlServer` ni `Relational` : pas de `Database`, pas de transaction, pas de SQL brut. Ce qui en a besoin passe par un port (`IEventLock`).
-- `IAppDbContext` expose `DbSet<Event>`, `DbSet<AssociationSettings>`, `SaveChangesAsync`. Enregistré `AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>())` : **même instance** que celle d'Identity et du verrou pendant la requête.
+- `IAppDbContext` expose `DbSet<Event>`, `DbSet<AssociationSettings>`, `DbSet<Reservation>`, `SaveChangesAsync`. Enregistré `AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>())` : **même instance** que celle d'Identity et du verrou pendant la requête.
 - Pas de repository : un `DbSet` est déjà un repository + unit of work.
+
+## 9. `ExecuteUpdateAsync` : une mise à jour en masse sans charger les entités
+
+- **C'est quoi** : `db.Reservations.Where(...).ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, ReservationStatus.Expired), ct)` envoie **un seul** `UPDATE ... WHERE ...` ; aucune entité n'est chargée ni suivie. En EF Core 10, la méthode est dans le paquet de base (pas besoin de `Relational` dans Application).
+- **Projet** : `ReservationExpiryService.ExpireDueForEventAsync` écrit « Expirée » sur les demandes échues d'un événement, sous le verrou, avant une nouvelle demande (libère l'index unique filtré).
+- **Pièges** : le `ChangeTracker` n'est pas mis à jour (une entité déjà chargée garde l'ancien statut) ; pas de contrôle de `rowversion` (mais SQL Server change quand même la `rowversion` des lignes touchées : une transition concurrente sur l'une d'elles échouera en conflit, ce qu'on veut) ; la requête doit être **idempotente** si le bloc peut être rejoué (`WHERE Status = 1`).
+
+## 10. Une règle, deux écritures : Domain et SQL
+
+`Reservation.IsActive(now)` (C#, en mémoire) et `ReservationQueries.IsActive(now)` (`Expression<Func<Reservation, bool>>`, traduite en SQL) disent la même chose. Pour qu'elles ne divergent pas : un **test de concordance** (`ReservationRulesTests.Active_rule_matches_in_sql_and_in_memory`) insère les 6 statuts × échéance passée / exacte / future et compare les deux ensembles. Composer deux expressions (« active » ET « événement non terminé ») : on remplace le paramètre de l'une par celui de l'autre avec un petit `ExpressionVisitor` (EF ne sait pas traduire l'appel d'un délégué).
+
+## 11. Rejouer une fois après un conflit qui ne change rien au métier
+
+Un `DbUpdateConcurrencyException` dit « la ligne a changé », pas « la règle est violée ». Exemples du projet (revue du 24/11) :
+
+- **Membre** (`MemberReservationService.CancelAsync`) : l'admin a déplacé la date, l'échéance a été recalculée, le statut est toujours « En attente ». On relit le statut **effectif** ; s'il est égal à celui vu avant `CancelByUser`, `db.ChangeTracker.Clear()`, relecture, règle réappliquée **une fois**. Sinon 409 `reservation_state_changed`.
+- **Admin** (`AdminEventService.UpdateAsync`) : `ex.Entries.All(e => e.Entity is Reservation)` → seul un membre a bougé (la fiche admin n'est pas périmée) : on rejoue le bloc verrouillé une fois au lieu de `concurrent_update`.
+- **Pièges** : sans `ChangeTracker.Clear()`, EF renvoie l'entité suivie (modifiée, ancienne `rowversion`) au lieu de la ligne relue ; rejouer **sans limite** peut boucler ; un verrou sur l'événement ne protège **pas** les lignes de réservation qu'une autre opération modifie sans ce verrou.
+- **Tester** : une `SqlConnection` de test fait `UPDATE ... SET ExpiresAt = ...` dans une transaction **non validée** ; la requête de l'API lit l'ancienne version (RCSI), son `UPDATE` attend ; `COMMIT` → 0 ligne touchée → rejeu (`ReservationBoundaryApiTests`).
 
 ## Questions d'entretien
 
@@ -103,8 +122,19 @@
 - **Comment EF détecte-t-il un conflit ?** Le token est dans le `WHERE` de l'`UPDATE` ; 0 ligne affectée → `DbUpdateConcurrencyException`.
 - **Pourquoi `CreateExecutionStrategy().ExecuteAsync` ?** Avec la reprise automatique, EF doit pouvoir rejouer toute la transaction ; il refuse une transaction utilisateur hors de ce bloc.
 - **`FromSql` et injection SQL ?** `FromSql($"... {id}")` paramètre les valeurs interpolées ; `FromSqlRaw("... " + id)` non.
+- **`ExecuteUpdate` ou charger puis `SaveChanges` ?** `ExecuteUpdate` pour une mise à jour en masse sans règle par ligne (expiration) ; charger + méthode du Domain + `SaveChanges` quand la règle métier doit s'appliquer à chaque ligne (annulation, recalcul d'échéance).
 - **`HasData` pour quoi faire ?** Des données qui font partie du schéma (ligne singleton, valeurs de référence), versionnées avec les migrations.
 
 ## Exercice (facultatif)
 
 Écrire un test d'intégration qui ouvre une transaction SQL à la main avec `WITH (UPDLOCK)` sur un événement, lance un `PUT` de cet événement dans une autre tâche, vérifie qu'il ne répond pas tant que la transaction est ouverte, puis qu'il répond 200 après le `COMMIT`.
+
+## 12. Tâche B : transitions admin sans verrou, une requête pour les coordonnées
+
+- **Pas d'`UPDLOCK` pour confirmer, refuser, annuler, « Payée »** (ADR 0019 § 1) : aucune de ces actions ne peut faire **monter** le nombre de places prises. La seule protection utile est la `rowversion` de la **réservation** : deux admins qui cliquent en même temps → un `UPDATE ... WHERE Id = @id AND RowVersion = @lue` touche 1 ligne, l'autre 0 → `DbUpdateConcurrencyException` → 409 `reservation_state_changed` avec le statut relu. Test : `AdminReservationConcurrencyTests` (5 tours « confirmer contre refuser », « confirmer contre annulation par le membre », « double confirmation »).
+- **Deux chemins vers le même 409** : si la seconde requête lit **après** l'écriture de la première, c'est le **Domain** qui refuse (`Confirm` sur une Confirmée) ; si elle a lu **avant**, c'est la **rowversion**. Les tests vérifient le résultat (un 200, un 409 avec le statut du gagnant), pas le chemin.
+- **Réapplication unique** (même schéma que § 11) : si la ligne a changé mais pas son statut effectif (échéance recalculée, « Payée » posée par un autre admin), `ChangeTracker.Clear()`, relecture, nouvelle tentative ; un second conflit → 409 **`concurrent_update`** (« déjà traitée » serait faux : le statut n'a pas bougé). Une action valable **dans tous les statuts** (« Retirer Payée ») passe `reapplyIfStatusChanged: true` : le changement de statut ne la rend pas caduque.
+- **Rendre une course déterministe** : un `SaveChangesInterceptor` (≈ un middleware autour de `SaveChanges`) écrit sur la ligne **depuis une autre connexion** dans `SavingChangesAsync`, donc juste avant l'`UPDATE` d'EF, qui touche 0 ligne. Branché pour un seul test par `factory.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.ConfigureDbContext<AppDbContext>(o => o.AddInterceptors(i))))` (`ConfigureDbContext`, EF Core 9+ : complète l'enregistrement existant). Piège : `UPDATE T SET X = X` change **quand même** la `rowversion`. Test : `AdminReservationReapplyTests`.
+- **N+1 évité** : la liste des inscrits charge les réservations (1 requête), puis **toutes** les coordonnées (membres et admins « Payée ») en **une** requête `WHERE Id IN (...)` via le port `IIdentityService.GetContactsAsync` (Application ne voit pas `AppUser`, ADR 0001). Contrat : un compte supprimé est **absent** du dictionnaire → « Compte supprimé ».
+
+Question d'entretien : **pourquoi ne pas verrouiller aussi la confirmation ?** Elle ne change pas l'occupation (En attente et Confirmée occupent toutes deux une place) ; verrouiller allongerait la file d'attente des demandes sur un événement très demandé, sans rien garantir de plus.

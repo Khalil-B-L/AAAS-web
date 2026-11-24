@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using Aaas.Api.Auth;
 using Aaas.Api.Errors;
+using Aaas.Api.Jobs;
 using Aaas.Application;
 using Aaas.Infrastructure;
 using Aaas.Infrastructure.Initialization;
@@ -41,6 +42,10 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// En tête : une requête /api/ compte comme activité si sa réponse est < 400 (pas un robot en 401/404) ; /health jamais (ADR 0020 § 4).
+app.UseApiActivityTracking();
+// Avant le gestionnaire d'exceptions : l'en-tête doit aussi partir avec les réponses d'erreur.
+app.UseNoStoreForPersonalData();
 app.UseExceptionHandler();
 // Donne un corps ProblemDetails aux 401/403/404 vides produits par le framework (ex. jeton absent).
 app.UseStatusCodePages();

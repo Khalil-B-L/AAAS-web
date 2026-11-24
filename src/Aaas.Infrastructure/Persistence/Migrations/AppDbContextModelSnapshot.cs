@@ -94,6 +94,85 @@ namespace Aaas.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Aaas.Domain.Reservations.Reservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsPaid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("PaidByAdminId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RefusalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaidByAdminId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("EventId", "Status")
+                        .HasDatabaseName("IX_Reservations_EventId_Status");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("EventId", "Status"), new[] { "ExpiresAt" });
+
+                    b.HasIndex("EventId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Reservations_Event_User_Active")
+                        .HasFilter("[Status] IN (1, 2) AND [UserId] IS NOT NULL");
+
+                    b.HasIndex("Status", "ExpiresAt")
+                        .HasDatabaseName("IX_Reservations_Status_ExpiresAt");
+
+                    b.ToTable("Reservations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Reservations_Deadline", "[ExpiresAt] > [RequestedAt]");
+
+                            t.HasCheckConstraint("CK_Reservations_Paid", "[IsPaid] = 0 OR [Status] IN (2, 5, 6)");
+
+                            t.HasCheckConstraint("CK_Reservations_PaidAt", "[IsPaid] = 0 OR [PaidAt] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_Reservations_Status", "[Status] BETWEEN 1 AND 6");
+                        });
+                });
+
             modelBuilder.Entity("Aaas.Domain.Settings.AssociationSettings", b =>
                 {
                     b.Property<int>("Id")
@@ -352,6 +431,25 @@ namespace Aaas.Infrastructure.Persistence.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Aaas.Domain.Reservations.Reservation", b =>
+                {
+                    b.HasOne("Aaas.Domain.Events.Event", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Aaas.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("PaidByAdminId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Aaas.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

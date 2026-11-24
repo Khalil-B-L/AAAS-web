@@ -4,6 +4,7 @@
 #
 #   bash front/e2e/pile-e2e.sh up        construit les images, démarre, crée les données de test
 #   bash front/e2e/pile-e2e.sh parcours  lance le parcours navigateur (Edge ou Chrome sans interface)
+#   bash front/e2e/pile-e2e.sh reservations  parcours HTTP des réservations (demande, 409, « ma demande », annulation)
 #   bash front/e2e/pile-e2e.sh down      supprime tout (conteneurs, réseau, images aaas-api:e2e et aaas-front:e2e)
 #
 # À lancer depuis la racine du dépôt, sous Git Bash ou Linux. Détails : docs/technique/exploitation.md.
@@ -125,6 +126,59 @@ parcours() {
     node front/e2e/parcours-navigateur.mjs
 }
 
+# Code HTTP seul (corps dans $STATE_DIR/last-body) : on vérifie les 409 sans que -f n'arrête le script.
+http_status() {
+  curl -sS -o "$STATE_DIR/last-body" -D "$STATE_DIR/last-headers" -w "%{http_code}" "$@"
+}
+
+expect_status() {
+  local expected="$1" label="$2"
+  shift 2
+  local status
+  status=$(http_status "$@")
+  if [[ "$status" != "$expected" ]]; then
+    echo "ÉCHEC : $label → $status (attendu $expected) : $(head -c 300 "$STATE_DIR/last-body")" >&2
+    return 1
+  fi
+  echo "    OK $label → $status"
+}
+
+# Tâche A des réservations (US-D1 à D4), à travers nginx comme le navigateur.
+reservations() {
+  local event_id email token reservation_id
+  event_id="$(cat "$STATE_DIR/event-id")"
+  email="membre-$(random 4)@exemple.test"
+  token=$(curl -fsS -X POST "$BASE/api/auth/register" -H 'Content-Type: application/json'     -d "{\"firstName\":\"Membre\",\"lastName\":\"E2E\",\"email\":\"$email\",\"phoneNumber\":\"+216 20 111 222\",\"password\":\"motdepasse1\",\"acceptPrivacyPolicy\":true}"     | json_field accessToken)
+  local auth=(-H "Authorization: Bearer $token")
+  local json=(-H 'Content-Type: application/json')
+  # Rejouable : on compare aux places lues AVANT (un passage précédent ou le parcours navigateur a pu en prendre).
+  local seats_before
+  seats_before=$(curl -fsS "$BASE/api/events/$event_id" | json_field remainingSeats)
+
+  expect_status 401 "visiteur sur /api/me/reservations" "$BASE/api/me/reservations"
+  expect_status 204 "aucune demande pour cet événement" "${auth[@]}" "$BASE/api/me/events/$event_id/reservation"
+  grep -qi '^cache-control: no-store' "$STATE_DIR/last-headers" || { echo "ÉCHEC : Cache-Control no-store absent" >&2; return 1; }
+  echo "    OK Cache-Control: no-store"
+  expect_status 201 "demande de place" -X POST "${auth[@]}" "${json[@]}" -d "{\"eventId\":\"$event_id\"}" "$BASE/api/me/reservations"
+  reservation_id=$(json_field id < "$STATE_DIR/last-body")
+  expect_status 409 "deuxième demande (already_reserved)" -X POST "${auth[@]}" "${json[@]}" -d "{\"eventId\":\"$event_id\"}" "$BASE/api/me/reservations"
+  [[ "$(json_field reservationId < "$STATE_DIR/last-body")" == "$reservation_id" ]] || { echo "ÉCHEC : reservationId" >&2; return 1; }
+  expect_status 200 "ma demande sur le détail" "${auth[@]}" "$BASE/api/me/events/$event_id/reservation"
+  local seats_after
+  seats_after=$(curl -fsS "$BASE/api/events/$event_id" | json_field remainingSeats)
+  [[ "$seats_after" == "$((seats_before - 1))" ]] || { echo "ÉCHEC : places restantes $seats_after (attendu $((seats_before - 1)))" >&2; return 1; }
+  echo "    OK places restantes : $seats_before → $seats_after"
+  expect_status 200 "mes réservations (à venir)" "${auth[@]}" "$BASE/api/me/reservations?scope=current"
+  expect_status 200 "annulation" -X POST "${auth[@]}" "$BASE/api/me/reservations/$reservation_id/cancel"
+  expect_status 409 "deuxième annulation (reservation_state_changed)" -X POST "${auth[@]}" "$BASE/api/me/reservations/$reservation_id/cancel"
+  expect_status 201 "nouvelle demande après annulation" -X POST "${auth[@]}" "${json[@]}" -d "{\"eventId\":\"$event_id\"}" "$BASE/api/me/reservations"
+  # Rend la place : le parcours suivant (ou un nouveau passage) retrouve le même nombre de places.
+  expect_status 200 "annulation de fin de parcours" -X POST "${auth[@]}" "$BASE/api/me/reservations/$(json_field id < "$STATE_DIR/last-body")/cancel"
+  [[ "$(curl -fsS "$BASE/api/events/$event_id" | json_field remainingSeats)" == "$seats_before" ]] || { echo "ÉCHEC : place non rendue" >&2; return 1; }
+  echo "    OK places revenues à $seats_before"
+  echo "Parcours réservations : OK"
+}
+
 down() {
   docker rm -f aaas-e2e-front aaas-e2e-api aaas-e2e-sql >/dev/null 2>&1 || true
   docker network rm aaas-e2e >/dev/null 2>&1 || true
@@ -137,9 +191,9 @@ down() {
 
 # Liste blanche : l'argument n'est jamais exécuté tel quel (« pile-e2e.sh rm » ou une faute de frappe échouent proprement).
 case "${1:-}" in
-  up | parcours | down) "$1" ;;
+  up | parcours | reservations | down) "$1" ;;
   *)
-    echo "Usage : pile-e2e.sh up|parcours|down" >&2
+    echo "Usage : pile-e2e.sh up|parcours|reservations|down" >&2
     exit 2
     ;;
 esac

@@ -1,0 +1,194 @@
+<section class="page page--wide">
+  @if (!validId()) {
+    <h1>Contenu introuvable</h1>
+    <p>Cette page n'existe pas ou n'est plus disponible.</p>
+    <a mat-stroked-button routerLink="/admin/evenements">Retour</a>
+  } @else if (loadError(); as message) {
+    <h1>Inscrits</h1>
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="registrants.reload()">Réessayer</button>
+    </div>
+    <a mat-stroked-button routerLink="/admin/evenements">Retour</a>
+  } @else if (registrants.hasValue()) {
+    @let data = registrants.value();
+    @let isPaying = data.event.price !== null;
+    <h1>Inscrits — {{ data.event.title }}</h1>
+    <p class="muted">
+      {{ data.event.startsAt | date: dateFormat }} ·
+      <a [routerLink]="['/admin/evenements', data.event.id]">Modifier l'événement</a>
+    </p>
+    <p>
+      <strong>{{ data.occupancy.active }} / {{ data.event.capacity }} places occupées</strong>
+      ({{ data.occupancy.confirmed }} confirmées, {{ data.occupancy.pending }} en attente)
+    </p>
+    <p class="muted reminder">Ces coordonnées sont réservées à l'organisation de l'événement.</p>
+
+    @if (data.event.hasEnded) {
+      <div class="banner" role="status">
+        <p>Cet événement est terminé : les réservations ne peuvent plus être annulées.</p>
+      </div>
+    }
+
+    @if (actionError(); as message) {
+      <div class="banner banner--error" role="alert">
+        <p>{{ message }}</p>
+      </div>
+    }
+
+    @if (isEmpty()) {
+      <p class="muted">Aucune demande pour le moment.</p>
+    } @else {
+      <h2>Demandes en attente</h2>
+      <ng-container
+        *ngTemplateOutlet="rows; context: { $implicit: data.pending, group: 'pending', isPaying: isPaying }"
+      />
+      <h2>Réservations confirmées</h2>
+      <ng-container
+        *ngTemplateOutlet="rows; context: { $implicit: data.confirmed, group: 'confirmed', isPaying: isPaying }"
+      />
+      <h2>Autres (refusées, expirées, annulées)</h2>
+      <ng-container
+        *ngTemplateOutlet="rows; context: { $implicit: data.others, group: 'others', isPaying: isPaying }"
+      />
+    }
+  } @else {
+    <app-loading />
+  }
+</section>
+
+<!-- Un même tableau pour les trois groupes ; les colonnes « À traiter avant », « Paiement » et « Statut » dépendent du groupe. -->
+<ng-template #rows let-items let-group="group" let-isPaying="isPaying">
+  @if (items.length === 0) {
+    <p class="muted">Aucune.</p>
+  } @else {
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Prénom</th>
+            <th scope="col">Nom</th>
+            <th scope="col">Téléphone</th>
+            <th scope="col">E-mail</th>
+            <th scope="col">Demandée le</th>
+            @if (group === 'pending') {
+              <th scope="col">À traiter avant</th>
+            }
+            @if (group === 'others') {
+              <th scope="col">Statut</th>
+            }
+            @if (isPaying && group !== 'pending') {
+              <th scope="col">Paiement</th>
+            }
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of asRows(items); track r.id) {
+            <tr>
+              @if (r.member; as m) {
+                <td>{{ m.firstName }}</td>
+                <td>{{ m.lastName }}</td>
+                <td>
+                  <div class="contact-links">
+                    <a [href]="telLink(m.phoneNumber)">{{ formatPhone(m.phoneNumber) }}</a>
+                    <a
+                      [href]="whatsAppLink(m.phoneNumber)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      [attr.aria-label]="whatsAppLabel(m)"
+                      >WhatsApp</a
+                    >
+                  </div>
+                </td>
+                <td><a [href]="'mailto:' + m.email">{{ m.email }}</a></td>
+              } @else {
+                <td colspan="4" class="muted">Compte supprimé</td>
+              }
+              <td>{{ r.requestedAt | date: dateFormat }}</td>
+              @if (group === 'pending') {
+                <td>{{ r.expiresAt | date: dateFormat }}</td>
+              }
+              @if (group === 'others') {
+                <td>
+                  {{ statusLabel(r.status) }}
+                  @if (r.refusalReason) {
+                    <div class="muted small">Motif : {{ r.refusalReason }}</div>
+                  }
+                </td>
+              }
+              @if (isPaying && group !== 'pending') {
+                <td>
+                  @if (r.isPaid) {
+                    Payée{{ r.paidAt ? ' le ' + (r.paidAt | date: dayFormat) : '' }} par {{ paidByName(r) }}
+                  } @else {
+                    Non payée
+                  }
+                </td>
+              }
+              <td>
+                <div class="row-actions">
+                  @if (r.actions.canConfirm) {
+                    <button
+                      mat-flat-button
+                      type="button"
+                      [disabled]="busyIds().has(r.id)"
+                      [attr.aria-label]="rowLabel('Confirmer', r)"
+                      (click)="act(r, 'confirm')"
+                    >
+                      Confirmer
+                    </button>
+                  }
+                  @if (r.actions.canRefuse) {
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      [disabled]="busyIds().has(r.id)"
+                      [attr.aria-label]="rowLabel('Refuser', r)"
+                      (click)="act(r, 'refuse')"
+                    >
+                      Refuser
+                    </button>
+                  }
+                  @if (r.actions.canMarkPaid) {
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      [disabled]="busyIds().has(r.id)"
+                      [attr.aria-label]="rowLabel('Marquer comme payée', r)"
+                      (click)="act(r, 'mark-paid')"
+                    >
+                      Marquer comme payée
+                    </button>
+                  }
+                  @if (r.actions.canUnmarkPaid) {
+                    <button
+                      mat-button
+                      type="button"
+                      [disabled]="busyIds().has(r.id)"
+                      [attr.aria-label]="rowLabel('Retirer la mention payée', r)"
+                      (click)="act(r, 'unmark-paid')"
+                    >
+                      Retirer la mention payée
+                    </button>
+                  }
+                  @if (r.actions.canCancel) {
+                    <button
+                      mat-button
+                      type="button"
+                      [disabled]="busyIds().has(r.id)"
+                      [attr.aria-label]="rowLabel('Annuler la réservation', r)"
+                      (click)="act(r, 'cancel')"
+                    >
+                      Annuler la réservation
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</ng-template>

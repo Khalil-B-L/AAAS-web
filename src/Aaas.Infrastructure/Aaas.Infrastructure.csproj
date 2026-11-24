@@ -13,5 +13,7 @@
   <ItemGroup>
     <!-- EventLock est interne : le test vérifie le SQL de verrouillage sans l'exposer publiquement. -->
     <InternalsVisibleTo Include="Aaas.Infrastructure.Tests" />
+    <!-- ExpirePendingReservationsJob.RunOnceAsync : un passage appelé directement, sans attendre le timer. -->
+    <InternalsVisibleTo Include="Aaas.Api.IntegrationTests" />
   </ItemGroup>
 </Project>

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Projet** | AAAS — application web de l'association |
-| **Version** | 1.3 — 23/11/2026 |
+| **Version** | 1.4 — 24/11/2026 |
 | **Porteur** | Khalil-B-L |
 | **Statut** | Validé pour démarrage — toute modification passe par l'historique en fin de document |
 
@@ -35,7 +35,7 @@ Le projet a un **double objectif** :
 |---|---|
 | **Visiteur** | Personne non connectée : consulte les actualités et les événements. |
 | **Membre** (utilisateur) | A un compte : demande des réservations, les suit, les annule, gère son compte. |
-| **Administrateur** | Bénévole de l'association : publie le contenu, traite les demandes de réservation, suit les paiements. |
+| **Administrateur** | Bénévole de l'association : publie le contenu, traite les demandes de réservation, suit les paiements. Il a aussi les droits d'un membre : il peut demander une place pour lui-même (RG-03). |
 
 ## 4. Périmètre
 
@@ -67,7 +67,7 @@ Le détail (user stories, critères d'acceptation Gherkin) est dans [`fonctionne
 1. Le membre connecté fait une **demande** sur un événement réservable → statut **En attente**. Une place est bloquée.
 2. L'application lui affiche le **numéro de téléphone (ou WhatsApp) de l'administrateur** à contacter pour valider la demande (et régler le prix s'il y en a un).
 3. L'administrateur **confirme** ou **refuse** la demande dans l'application.
-4. Sans action de l'admin dans le délai prévu, la demande **expire** automatiquement et la place est libérée.
+4. Sans action de l'admin dans le délai prévu, la demande **expire** automatiquement et la place est libérée. Si l'admin change la date de l'événement entre-temps, l'échéance est recalculée (RG-04).
 
 | Statut | Signification | Compte dans les places prises ? |
 |---|---|---|
@@ -83,21 +83,22 @@ Le détail (user stories, critères d'acceptation Gherkin) est dans [`fonctionne
 | Réf. | Règle |
 |---|---|
 | RG-01 | Un événement n'est réservable que s'il est **publié**, **non annulé**, **pas encore commencé** et **non complet**. |
-| RG-02 | Places prises = demandes **En attente** + **Confirmées**. La capacité ne doit **jamais** être dépassée, y compris quand deux membres réservent la dernière place en même temps. |
-| RG-03 | Une seule réservation active (En attente ou Confirmée) par membre et par événement. Une nouvelle demande est possible après refus, expiration ou annulation. |
-| RG-04 | Une demande En attente expire après **48 h** sans validation, et au plus tard au début de l'événement. |
-| RG-05 | Le membre peut annuler une demande **En attente** jusqu'au début de l'événement, et une réservation **Confirmée** jusqu'à **24 h** avant le début ; la place est libérée immédiatement. |
+| RG-02 | Places prises = demandes **En attente** (dont l'échéance n'est pas dépassée) + **Confirmées**. La capacité ne doit **jamais** être dépassée, y compris quand deux membres réservent la dernière place en même temps. |
+| RG-03 | Une seule réservation active (En attente ou Confirmée) par membre et par événement. Une nouvelle demande est possible après refus, expiration ou annulation, **sans limite du nombre de demandes** (l'admin peut refuser à nouveau). **Un administrateur peut demander une place pour lui-même**, selon le même parcours qu'un membre. |
+| RG-04 | Une demande En attente a une **échéance** : **48 h après la demande, ou au début de l'événement si c'est plus tôt**. Passée l'échéance, la demande est expirée (et ne compte plus dans les places prises). **Si un admin change la date de début de l'événement**, l'échéance de chaque demande En attente non échue est **recalculée** avec la même formule à partir du nouveau début : ramenée au nouveau début si l'événement avance ; allongée s'il recule, sans jamais dépasser 48 h après la demande. Une demande déjà échue n'est **jamais ranimée**. |
+| RG-05 | Le membre peut annuler une demande **En attente** jusqu'au début de l'événement, et une réservation **Confirmée** jusqu'à **24 h** avant le début **actuel** de l'événement (donc après un éventuel changement de date) ; la place est libérée immédiatement. |
 | RG-06 | L'admin ne peut pas réduire la capacité sous le nombre de places prises. |
 | RG-07 | Un événement ayant eu des réservations ne peut pas être supprimé, seulement **annulé** ; ses réservations actives passent à « Annulée par l'association ». Un **brouillon qui n'a jamais été publié** peut être supprimé par un admin (après confirmation), puisqu'il n'a jamais pu recevoir de réservation. |
-| RG-08 | Prix optionnel en **dinars tunisiens (TND)**, jusqu'à 3 décimales (millimes) ; vide ou 0 = gratuit. L'admin ajoute la mention **payée** à une réservation Confirmée (ce n'est pas un statut, elle peut être retirée en cas d'erreur) ; aucun remboursement n'est géré par l'application. |
+| RG-08 | Prix optionnel en **dinars tunisiens (TND)**, jusqu'à 3 décimales (millimes) ; vide ou 0 = gratuit. L'admin ajoute la mention **payée** à une réservation Confirmée d'un événement payant (ce n'est pas un statut), **à tout moment, y compris après la fin de l'événement**. Elle peut être **retirée** en cas d'erreur, **y compris sur une réservation annulée** ; elle reste visible sur une réservation annulée pour le suivi. Aucun remboursement n'est géré par l'application. |
 | RG-09 | Il existe toujours au moins un administrateur. |
 | RG-10 | Le numéro de contact de l'association (avec option WhatsApp) est configurable par les admins, sans modifier le code. **Un admin peut aussi le retirer** (l'association n'a alors plus de numéro affiché). Il n'est affiché qu'aux membres connectés, jamais aux visiteurs. |
 | RG-11 | Le téléphone du membre est obligatoire à l'inscription, pour que l'admin puisse le joindre. **Seuls les numéros tunisiens sont acceptés : « +216 » suivi de exactement 8 chiffres, mobile ou fixe** (exemple : +216 20 123 456). La saisie locale sans préfixe, le préfixe « 00 » et les numéros internationaux sont refusés. La même règle s'applique au numéro de contact de l'association (RG-10). |
-| RG-12 | Un événement peut être **modifié** par un admin tant qu'il n'est **ni terminé ni annulé**, **y compris s'il a déjà commencé** (la date de début ne peut alors pas être déplacée dans le passé). Si l'événement a des inscrits (En attente ou Confirmées), un changement de **date, d'heure ou de prix** demande une confirmation de l'admin (avertissement) ; un changement de **lieu** n'en demande pas. |
+| RG-12 | Un événement peut être **modifié** par un admin tant qu'il n'est **ni terminé ni annulé**, **y compris s'il a déjà commencé** (la date de début ne peut alors pas être déplacée dans le passé). Si l'événement a des inscrits (En attente ou Confirmées), un changement de **date, d'heure ou de prix** demande une confirmation de l'admin (avertissement) ; un changement de **lieu** n'en demande pas. Un changement de date recalcule les échéances des demandes En attente (RG-04). |
 | RG-13 | Limites de saisie d'un événement : **capacité** entière de 1 à 10 000 ; **prix** de 0 à 99 999,999 TND ; **titre** et **lieu** : 200 caractères au plus ; **description** : 4 000 caractères au plus. |
 | RG-14 | Visibilité publique d'un événement : la liste ne montre que les événements **publiés ou annulés qui ne sont pas terminés** (un événement en cours reste donc listé, sans réservation possible), **20 par page**. Le **détail** d'un événement publié ou annulé reste accessible par son adresse **même une fois terminé** (historique conservé, utile aux « Mes réservations »). Un brouillon n'est jamais visible du public. |
+| RG-15 | **Visibilité des coordonnées par les administrateurs.** Les administrateurs voient le **prénom, le nom, le téléphone et l'e-mail** des personnes qui ont fait une demande (liste des demandes à traiter et liste des inscrits d'un événement), pour traiter les demandes, les joindre, préparer l'accueil et prévenir en cas d'annulation. Ces coordonnées ne sont visibles **ni des autres membres ni des visiteurs**. La politique de confidentialité le mentionne (§ 6.4). Une réservation dont le compte a été supprimé s'affiche « Compte supprimé », sans coordonnées. |
 
-Les valeurs par défaut (48 h, 24 h) sont paramétrables et peuvent évoluer selon les réponses de l'association (questions ouvertes dans `fonctionnel/mvp.md`).
+Les valeurs par défaut (48 h, 24 h) sont **paramétrables dans la configuration de l'application** (pas modifiables depuis l'interface au MVP) et peuvent évoluer selon les réponses de l'association (questions ouvertes dans `fonctionnel/mvp.md`).
 
 ## 6. Exigences non fonctionnelles
 
@@ -119,6 +120,7 @@ Les valeurs par défaut (48 h, 24 h) sont paramétrables et peuvent évoluer sel
 ### 6.4 Protection des données personnelles
 - Cadre légal : **loi organique tunisienne n° 2004-63 du 27 juillet 2004** (autorité de contrôle : INPDP), et non le RGPD.
 - Données collectées limitées au nécessaire : prénom, nom, e-mail, téléphone, mot de passe haché ; **date de création du compte** (affichée au membre, US-F3) ; **date de dernière connexion** (pour repérer les comptes inactifs depuis 3 ans, R25) ; **consentement : date d'acceptation et version de la politique de confidentialité acceptée**. Accord explicite à l'inscription.
+- **Visibilité par les administrateurs (RG-15)** : les administrateurs voient prénom, nom, téléphone et e-mail des inscrits ; la politique de confidentialité l'indique et en donne la raison.
 - **Mineurs** : aucun contrôle ni case à cocher dédiés ; le site est accessible à tout le monde.
 - Le membre peut **supprimer son compte** : réservations à venir annulées, historique passé anonymisé.
 - La nécessité d'une déclaration auprès de l'INPDP est à vérifier par l'association.
@@ -199,3 +201,4 @@ Une fonctionnalité est **terminée** quand :
 | 1.1 | 10/11/2026 | Décisions du porteur : (1) données du compte complétées par la date de création et la date de dernière connexion (US-F3, R25) ; (2) téléphone du membre : uniquement « +216 » + 8 chiffres (RG-11) ; (3) mineurs : aucun contrôle dédié, site accessible à tous (§ 6.4) ; (4) consentement : conservation de la version de la politique de confidentialité acceptée, avec la date (§ 6.4). Table de correspondance du vocabulaire ajoutée dans `fonctionnel/mvp.md`. |
 | 1.2 | 19/11/2026 | Décisions du porteur sur les questions de l'étape 2 : (1) un événement déjà commencé peut être modifié, pas un événement terminé ou annulé (RG-12, nouvelle) ; (2) le détail d'un événement terminé reste accessible, la liste ne montre que les non terminés, 20 par page (RG-14, nouvelle) ; (3) limites de saisie : capacité 1 à 10 000, prix jusqu'à 99 999,999 TND, titre et lieu 200 caractères, description 4 000 (RG-13, nouvelle) ; (4) un numéro fixe tunisien est accepté, soit « +216 » + 8 chiffres mobile ou fixe, aussi pour le numéro de contact de l'association (RG-11) ; (5) un admin peut retirer le numéro de contact (RG-10) ; (6) un brouillon jamais publié peut être supprimé dès l'étape 2 (RG-07, § 4.1) ; (7) changement de lieu : pas d'avertissement aux inscrits (RG-12). Détail et critères d'acceptation dans `fonctionnel/mvp.md` (version 4). |
 | 1.3 | 23/11/2026 | Décision du porteur (question P-1) : le planning (§ 8) passe en **tranches verticales** (pour chaque étape : API, puis ses écrans, puis tests et documentation) au lieu de « toute l'API en S1, tous les écrans en S2 ». Aucun changement de périmètre ni de règle. Valeurs par défaut du plan du front (UX-1 à UX-11, Q-T1, Q-T2) validées. Politique de confidentialité provisoire : `fonctionnel/politique-confidentialite.md` ; libellés des écrans : `fonctionnel/libelles-ecrans.md`. |
+| 1.4 | 24/11/2026 | Décisions du porteur sur la tranche « Réservations » (plan `technique/plan-reservations.md`, questions QF-1 à QF-10 : valeurs par défaut acceptées ; P-R1 à P-R8 acceptées) : (1) **échéance** d'une demande définie précisément et **recalculée** quand l'admin change la date de début, sans ranimer une demande échue ; le délai de 24 h d'annulation se compte depuis le début **actuel** (RG-04, RG-05, RG-12) ; (2) un administrateur peut demander une place pour lui-même ; pas de limite de nouvelles demandes après un refus (RG-03) ; (3) mention « payée » posable à tout moment, même après la fin de l'événement, et retirable même sur une réservation annulée (RG-08) ; (4) **nouvelle RG-15** : les administrateurs voient prénom, nom, téléphone et e-mail des inscrits, ce que la politique de confidentialité doit dire (§ 6.4) ; (5) délais 48 h / 24 h en configuration, non modifiables depuis l'interface (§ 5.2). Aucun changement de périmètre. Détail et critères d'acceptation dans `fonctionnel/mvp.md` (version 5). |

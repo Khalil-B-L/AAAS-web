@@ -41,7 +41,7 @@ Toutes les données du compte sont des colonnes de la ligne `AspNetUsers` : la s
 
 Règle de conception qui en découle : **aucune de ces données ne doit être recopiée ailleurs** (pas de nom ou de téléphone dénormalisé dans `Reservations`, pas de table d'audit des connexions, pas de journal contenant e-mail, téléphone ou nom). Une nouvelle donnée personnelle ajoutée plus tard doit l'être sur `AppUser`, ou bien prévoir explicitement son effacement ici.
 
-Schéma : `Reservations.UserId` et `Reservations.PaidByAdminId` sont des clés étrangères **nullables** avec `ON DELETE NO ACTION` ; le détachement est fait explicitement par l'application. (SQL Server refuse deux `ON DELETE SET NULL` d'une même table vers `AspNetUsers` : « multiple cascade paths ».) Une réservation sans utilisateur s'affiche « Compte supprimé » ; une mention payée sans admin s'affiche « Payée (administrateur supprimé) ».
+Schéma : `Reservations.UserId` et `Reservations.PaidByAdminId` sont des clés étrangères **nullables** avec `ON DELETE NO ACTION` ; le détachement est fait explicitement par l'application. (SQL Server refuse deux `ON DELETE SET NULL` d'une même table vers `AspNetUsers` : « multiple cascade paths ».) Une réservation sans utilisateur s'affiche « Compte supprimé » ; une mention payée sans admin s'affiche « Payée le {date} par un administrateur supprimé » (libellé retenu dans `docs/fonctionnel/libelles-ecrans.md`).
 
 Une réservation anonymisée ne contient plus aucune donnée personnelle : il reste l'événement, le statut, les dates de la réservation, le motif de refus et la mention payée.
 

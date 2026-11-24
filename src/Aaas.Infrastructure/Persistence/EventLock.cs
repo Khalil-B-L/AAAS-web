@@ -43,12 +43,29 @@ internal sealed class EventLock(AppDbContext db) : IEventLock
 
                 var result = await state.Work(ev, ct);
 
-                await db.SaveChangesAsync(ct);
+                await SaveChangesTranslatingUniqueViolationAsync(db, ct);
                 await transaction.CommitAsync(ct);
                 return result;
             },
             verifySucceeded: null,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// ADR 0019 § 3 : une violation d'index unique (2601/2627) devient une exception neutre d'Application, SANS
+    /// InnerException : le message SQL contient les clés dupliquées. Les autres erreurs remontent telles quelles.
+    /// Interne et statique pour être testée sans base (Aaas.Infrastructure.Tests).
+    /// </summary>
+    internal static async Task SaveChangesTranslatingUniqueViolationAsync(DbContext db, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex is not DbUpdateConcurrencyException && SqlServerErrors.IsUniqueKeyViolation(ex))
+        {
+            throw new UniqueConstraintViolationException();
+        }
     }
 
     /// <summary>

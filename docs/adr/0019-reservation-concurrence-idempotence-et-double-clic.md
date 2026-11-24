@@ -1,6 +1,6 @@
 # ADR 0019 — Réservations : concurrence, double clic et violation d'index
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 24/11/2026)
 - **Date** : 24/11/2026
 - **Mise en œuvre** : tranche « Réservations » (`plan-reservations.md`, tâches A et B)
 - **Références** : cahier RG-02, RG-03, risque § 11 ; mvp US-D1 (« dernière place »), US-E6 (« déjà traitée par un autre admin ») ; **précise** les ADR 0004 (verrou `UPDLOCK`), 0005 (matérialisation), 0006 (`rowversion`), 0012 (`IEventLock`)

@@ -48,4 +48,37 @@ public static class ErrorCodes
 
     /// <summary>Avertissement non bloquant (pas une erreur) renvoyé avec la publication (US-E8).</summary>
     public const string ContactNotConfigured = "contact_not_configured";
+
+    // Réservations (ADR 0018 § 4), toutes en 409.
+
+    /// <summary>RG-02 : plus aucune place (demandes en attente non échues + confirmées = capacité).</summary>
+    public const string EventFull = "event_full";
+
+    /// <summary>R2 : l'événement a commencé (ou est terminé) : plus de demande possible.</summary>
+    public const string ReservationsClosed = "reservations_closed";
+
+    /// <summary>RG-03 : le membre a déjà une demande en attente ou une réservation confirmée ; extension reservationId.</summary>
+    public const string AlreadyReserved = "already_reserved";
+
+    /// <summary>La demande n'est plus dans le statut attendu (traitée, annulée, expirée) ; extension currentStatus.</summary>
+    public const string ReservationStateChanged = "reservation_state_changed";
+
+    /// <summary>RG-05 : réservation confirmée, moins de 24 h avant le début : le membre doit contacter l'association.</summary>
+    public const string CancellationDeadlinePassed = "cancellation_deadline_passed";
+
+    /// <summary>RG-08 : « Payée » seulement sur une réservation confirmée (tâche B).</summary>
+    public const string ReservationNotConfirmed = "reservation_not_confirmed";
+
+    /// <summary>RG-08 : événement gratuit, aucun paiement à enregistrer (tâche B).</summary>
+    public const string PaymentNotApplicable = "payment_not_applicable";
+}
+
+/// <summary>Noms des extensions ajoutées aux ProblemDetails par <see cref="BusinessRuleException.Details"/>.</summary>
+public static class ErrorDetailKeys
+{
+    /// <summary>Statut effectif relu (Pending, Confirmed, Expired…), avec reservation_state_changed.</summary>
+    public const string CurrentStatus = "currentStatus";
+
+    /// <summary>Identifiant de la demande active existante, avec already_reserved (double clic, deuxième onglet).</summary>
+    public const string ReservationId = "reservationId";
 }

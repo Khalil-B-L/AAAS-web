@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
+import { RouterLink } from '@angular/router';
 import { AccountApi } from '../../../core/api/account.api';
 import { toApiError } from '../../../core/errors/api-error';
 import { DAY_FORMAT, DETAIL_DATE_FORMAT } from '../../../core/time/date-formats';
@@ -11,7 +12,7 @@ import { Loading } from '../../../shared/ui/loading';
 /** Mon compte (US-F3, lecture seule en semaine 2 ; suppression du compte avec US-F2). */
 @Component({
   selector: 'app-my-account',
-  imports: [DatePipe, MatButtonModule, Loading],
+  imports: [DatePipe, RouterLink, MatButtonModule, Loading],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './my-account.html',
   styleUrl: './my-account.scss',

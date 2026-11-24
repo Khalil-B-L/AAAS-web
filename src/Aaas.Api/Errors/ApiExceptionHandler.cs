@@ -53,6 +53,15 @@ internal sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsS
         }
 
         problem.Extensions[ProblemDetailsSetup.CodeExtension] = code;
+        if (exception is BusinessRuleException { Details: var details })
+        {
+            // ADR 0018 § 4 : l'état réel voyage avec le 409 (currentStatus, reservationId). Jamais de donnée personnelle.
+            foreach (var (key, value) in details)
+            {
+                problem.Extensions[key] = value;
+            }
+        }
+
         httpContext.Response.StatusCode = problem.Status!.Value;
         await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {

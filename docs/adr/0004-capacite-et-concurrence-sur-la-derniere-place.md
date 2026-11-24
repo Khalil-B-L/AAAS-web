@@ -1,6 +1,6 @@
 # ADR 0004 — Ne jamais dépasser la capacité en cas de demandes simultanées
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 24/11/2026)
 - **Date** : 10/11/2026
 - **Références** : cahier RG-02, RG-03, RG-06, RG-07, risque § 11 ; mvp US-D1, US-E2, US-E3, R4, R11
 

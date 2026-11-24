@@ -1,0 +1,97 @@
+<section class="reservation-panel" aria-labelledby="reservation-panel-title">
+  <h2 id="reservation-panel-title">Ma réservation</h2>
+
+  @if (!auth.isLoggedIn()) {
+    @if (event().isBookable) {
+      <div class="actions">
+        <a mat-flat-button routerLink="/connexion" [queryParams]="loginQueryParams()">Demander une place</a>
+        <span class="muted">
+          Vous devez être connecté pour demander une place.
+          <a routerLink="/inscription" [queryParams]="loginQueryParams()">Créer un compte</a>
+        </span>
+      </div>
+    } @else if (event().status === 'Published' && !event().hasEnded) {
+      <!-- Annulé ou terminé : le bandeau du détail le dit déjà. -->
+      <p class="muted">{{ event().isFull ? 'Cet événement est complet.' : 'Les réservations sont closes.' }}</p>
+    }
+  } @else if (loadError(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="mine.reload()">Réessayer</button>
+    </div>
+  } @else if (mine.isLoading() && !mine.hasValue()) {
+    <app-loading />
+  } @else {
+    @if (reservation(); as r) {
+      @switch (r.status) {
+        @case ('Pending') {
+          <div class="status-block">
+            <h3>Demande en attente de confirmation</h3>
+            <p>
+              Votre demande est enregistrée et une place vous est réservée. Pour la faire confirmer, contactez
+              l'association avant le {{ r.expiresAt | date: detailFormat }}. Sans confirmation avant cette date, la
+              demande expire et la place est libérée.
+            </p>
+            @if (r.event.price !== null) {
+              <p>Prix : {{ r.event.price | tndPrice }}.</p>
+            }
+            @if (r.canCancel) {
+              <button mat-stroked-button type="button" [disabled]="submitting()" (click)="cancel(r)">
+                Annuler ma demande
+              </button>
+            }
+            <app-contact-card />
+          </div>
+        }
+        @case ('Confirmed') {
+          <div class="status-block">
+            <h3>Réservation confirmée</h3>
+            @if (r.isPaid) {
+              <p><span class="chip">Payée</span></p>
+            } @else if (r.event.price !== null) {
+              <p>{{ r.event.price | tndPrice }}</p>
+            }
+            @if (r.canCancel) {
+              <p>Vous pouvez annuler jusqu'au {{ r.cancellableUntil | date: detailFormat }}.</p>
+              <button mat-stroked-button type="button" [disabled]="submitting()" (click)="cancel(r)">
+                Annuler ma réservation
+              </button>
+            } @else {
+              <p>Le délai d'annulation est dépassé. Pour vous désister, contactez l'association.</p>
+              <app-contact-card />
+            }
+          </div>
+        }
+        @default {
+          @if (previousMessage(); as message) {
+            <p class="banner banner--info" role="status">
+              {{ message }}
+              @if (r.status === 'Refused' && r.refusalReason) {
+                <br />Motif : {{ r.refusalReason }}
+              }
+            </p>
+          }
+        }
+      }
+    }
+
+    @if (canRequest()) {
+      <div class="actions">
+        <button mat-flat-button type="button" [disabled]="submitting()" (click)="request()">
+          {{ submitting() ? 'Envoi en cours…' : 'Demander une place' }}
+        </button>
+      </div>
+    } @else if (!hasActive() && event().status === 'Published' && !event().hasEnded) {
+      <p class="muted">{{ event().isFull ? 'Cet événement est complet.' : 'Les réservations sont closes.' }}</p>
+    }
+  }
+
+  @if (errorMessage(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+    </div>
+    @if (contactAfterError()) {
+      <app-contact-card />
+    }
+  }
+</section>

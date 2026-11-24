@@ -1,6 +1,6 @@
 # ADR 0005 — Expiration des demandes En attente
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 24/11/2026)
 - **Date** : 10/11/2026 — complété le 13/11/2026 (journalisation des erreurs de la tâche de fond, suite à l'ADR 0002)
 - **Références** : cahier RG-04, § 5.1 étape 4 ; mvp R6, US-D5, US-E6
 

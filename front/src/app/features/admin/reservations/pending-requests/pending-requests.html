@@ -1,0 +1,105 @@
+<section class="page page--wide">
+  <h1>Demandes à traiter</h1>
+
+  @if (actionError(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+    </div>
+  }
+
+  @if (loadError(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="requests.reload()">Réessayer</button>
+    </div>
+  } @else if (requests.hasValue()) {
+    <!-- @let : variable locale de template (≈ une variable Razor @{ var x = … }). -->
+    @let result = requests.value();
+    @if (lastPageIfOutOfRange()) {
+      <!-- Page vidée alors qu'il reste des demandes : l'effect du composant redirige, rien à afficher d'ici là. -->
+      <app-loading />
+    } @else if (result.items.length === 0) {
+      <p class="muted">Aucune demande à traiter.</p>
+    } @else {
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Membre</th>
+              <th scope="col">Événement</th>
+              <th scope="col">Demandée le</th>
+              <th scope="col">À traiter avant</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of result.items; track r.id) {
+              <tr>
+                <td>
+                  @if (r.member; as m) {
+                    <div>{{ m.firstName }} {{ m.lastName }}</div>
+                    <div class="contact-links">
+                      <a [href]="telLink(m.phoneNumber)">{{ formatPhone(m.phoneNumber) }}</a>
+                      <!-- noopener : la page WhatsApp ouverte ne peut pas piloter cet onglet. -->
+                      <a
+                        [href]="whatsAppLink(m.phoneNumber)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        [attr.aria-label]="whatsAppLabel(m)"
+                        >WhatsApp</a
+                      >
+                    </div>
+                    <a class="small" [href]="'mailto:' + m.email">{{ m.email }}</a>
+                  } @else {
+                    <span class="muted">Compte supprimé</span>
+                  }
+                </td>
+                <td>
+                  <a [routerLink]="['/admin/evenements', r.event.id, 'inscrits']">{{ r.event.title }}</a>
+                  <div class="muted small">{{ r.event.startsAt | date: dateFormat }}</div>
+                </td>
+                <td>{{ r.requestedAt | date: dateFormat }}</td>
+                <td>{{ r.expiresAt | date: dateFormat }}</td>
+                <td>
+                  <div class="row-actions">
+                    @if (r.actions.canConfirm) {
+                      <button
+                        mat-flat-button
+                        type="button"
+                        [disabled]="busyIds().has(r.id)"
+                        [attr.aria-label]="rowLabel('Confirmer', r, true)"
+                        (click)="act(r, 'confirm')"
+                      >
+                        Confirmer
+                      </button>
+                    }
+                    @if (r.actions.canRefuse) {
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        [disabled]="busyIds().has(r.id)"
+                        [attr.aria-label]="rowLabel('Refuser', r, true)"
+                        (click)="act(r, 'refuse')"
+                      >
+                        Refuser
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <app-pager
+      [page]="result.page"
+      [pageSize]="pageSize"
+      [totalCount]="result.totalCount"
+      (pageChange)="goToPage($event)"
+    />
+  } @else {
+    <app-loading />
+  }
+</section>

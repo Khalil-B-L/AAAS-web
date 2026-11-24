@@ -1,6 +1,6 @@
 # ADR 0021 — Réservations : routes de l'API et données personnelles des inscrits
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 24/11/2026)
 - **Date** : 24/11/2026
 - **Mise en œuvre** : tranche « Réservations », tâches A et B (`plan-reservations.md`)
 - **Références** : cahier § 6.2 (« un membre n'accède jamais aux réservations d'un autre »), § 6.4, RG-10 ; mvp US-C2, US-D2, US-D4, US-E4, US-E6, US-E7, R8, R24 ; ADR 0001 (ports), 0007 (suppression de compte), 0011 (listes), 0013 (numéro de contact)

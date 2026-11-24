@@ -341,3 +341,156 @@ html {
 - *Comment personnaliser les couleurs d'Angular Material 3 ?* Palettes passées à `mat.theme()` (générées depuis un hex par le schematic `theme-color`), puis `mat.theme-overrides()` pour des valeurs exactes et `mat.<composant>-overrides()` pour un composant.
 - *Variable Sass ou variable CSS ?* Sass : constante de compilation, disparaît du CSS. CSS : résolue par le navigateur, héritée, redéfinissable par zone et à l'exécution (thème sombre, zone colorée).
 - *Comment éviter le décalage de mise en page dû à une image ?* Donner `width` et `height` (ou `aspect-ratio`) pour réserver la place.
+
+## 17. Réservations (tâche A) : composant enfant, ressource conditionnelle, store partagé
+
+Code : `front/src/app/features/reservations/`, `core/contact/contact.store.ts`, `shared/ui/contact-card.ts`, `core/api/reservations.api.ts`.
+
+### Composant enfant : `input()` / `output()`
+
+- **C'est quoi** : le panneau « Ma réservation » (`<app-reservation-panel>`) est un composant **enfant** du détail. Il **reçoit** l'événement par `readonly event = input.required<EventDetailDto>()` et **prévient** son parent par `readonly changed = output<void>()`.
+- **Pourquoi** : après une demande ou une annulation, le nombre de places restantes change ; seul le parent possède la ressource du détail. Le parent écoute : `<app-reservation-panel [event]="e" (changed)="event.reload()" />`.
+- **Analogie .NET** : un composant Blazor avec `[Parameter]` (entrée) et `EventCallback` (sortie). `[event]="e"` = liaison de propriété (parent → enfant) ; `(changed)="…"` = liaison d'événement (enfant → parent).
+- **Piège rencontré** : le détail affichait le spinner pendant `event.reload()`, ce qui **détruisait** le panneau (et son message d'erreur). Correctif : `@else if (event.isLoading() && !event.hasValue())` — une ressource garde sa valeur pendant un rechargement.
+
+### `rxResource` conditionnelle
+
+```ts
+protected readonly mine = rxResource({
+  params: () => (this.auth.isLoggedIn() ? { eventId: this.event().id, userId: this.auth.session()?.userId } : undefined),
+  stream: ({ params }) => this.api.forEvent(params.eventId),
+});
+```
+
+- `params` renvoie `undefined` → ressource **au repos** : un visiteur n'appelle jamais `/api/me` (il recevrait 401).
+- `params` lit des signals (`isLoggedIn`, `session`, `event`) : quand l'un change (connexion, autre compte, autre événement), la ressource **se relance seule**. Mettre `userId` dans les params garantit qu'on ne montre jamais la demande d'un autre compte.
+- `this.mine.set(created)` : on remplace la valeur par la réponse du `POST` sans relire l'API ; `this.mine.reload()` relit (après un 409).
+
+### Piège : `params` qui recrée un objet → `computed` avec `equal`
+
+Après une demande, le parent relit le détail : `event()` devient un **nouvel objet** (même `id`). Le code ci-dessus recrée alors `{ eventId, userId }`, la ressource voit des params « différents » (comparaison par **référence**, `Object.is`), repasse en chargement et relit l'API : le `set()` est perdu. Correctif (revue du 24/11) :
+
+```ts
+private readonly mineKey = computed(
+  () => (this.auth.isLoggedIn() ? { eventId: this.event().id, userId: this.auth.session()?.userId } : undefined),
+  { equal: (a, b) => a?.eventId === b?.eventId && a?.userId === b?.userId },
+);
+protected readonly mine = rxResource({ params: () => this.mineKey(), stream: ... });
+```
+
+- **`equal`** : fonction d'égalité d'un `computed` (ou `signal`). Si elle répond « égal », le signal garde l'ancienne valeur et **ne prévient personne**.
+- **Analogie .NET** : passer d'une `class` (égalité de référence) à un `record` (égalité de valeur) ; ou un `IEqualityComparer<T>`.
+- Test : `public-pages.spec.ts`, « après une demande : … n'est PAS relue » (un seul appel à `forEvent`).
+
+### `effect()` qui écrit dans un signal : revenir à la dernière page
+
+« Mes réservations » : annuler la seule ligne de la page 2 laisse une page vide. `effect(() => this.backToLastPage(this.current, this.currentPage))` relit la ressource à chaque valeur et, si `items` est vide avec `page > 1`, fait `currentPage.set(dernière page)`. Écrire dans un signal depuis un `effect` est permis (Angular 19+) ; pas de boucle, car `set()` d'une valeur identique ne notifie rien.
+
+### `id` unique par instance (`aria-labelledby`)
+
+Plusieurs `<app-contact-card>` dans la même page : un `id="contact-card-title"` fixe serait dupliqué. Un compteur au niveau du module (`let nextId = 0;`, ≈ un champ `static`) donne `contact-card-title-1`, `-2`… liés par `[attr.aria-labelledby]="titleId"` et `[id]="titleId"`.
+
+### `HttpClient` et la réponse 204
+
+`GET /api/me/events/{id}/reservation` répond 204 (sans corps) s'il n'y a pas de demande. `HttpClient` émet alors **`null`** comme valeur, **sans erreur** : on type `Observable<MyReservationDto | null>` et le template teste `@if (reservation(); as r)`.
+
+### État « occupé » et double clic
+
+Signal `submitting` : le bouton est `[disabled]="submitting()"` et affiche « Envoi en cours… » ; la méthode vérifie aussi `if (this.submitting()) return;` (deux clics plus rapides que le rendu). Si un second `POST` passe quand même (deuxième onglet), l'API répond 409 `already_reserved` avec `reservationId` : le front **relit** la demande et n'affiche **aucune** erreur (ADR 0019 § 4). Le confort est côté front, la garantie côté API.
+
+### Store partagé : `ContactStore`
+
+- Un service `providedIn: 'root'` (singleton, ≈ `AddSingleton`) qui contient une `rxResource` **paresseuse** : `params` vaut `undefined` tant qu'aucun écran n'a appelé `ensureLoaded()`. Plusieurs cartes de contact sur une page = **un seul** appel HTTP.
+- Analogie .NET : un cache mémoire (`IMemoryCache`) rempli au premier accès, vidé à la déconnexion (les `params` dépendent de l'utilisateur).
+
+### Enchaîner un dialogue puis un appel : `switchMap`
+
+```ts
+return this.dialog.confirm({ ... }).pipe(
+  switchMap((confirmed) => (confirmed ? this.api.cancel(id).pipe(map(...), catchError(...)) : of({ kind: 'dismissed' }))),
+);
+```
+
+`switchMap` = « quand la première opération émet, lance la seconde » (≈ `await` de deux appels successifs). `catchError` transforme l'erreur HTTP en valeur `{ kind: 'failed', error }` : l'écran n'a qu'un seul `subscribe` à écrire.
+
+### `ng-template` + `ngTemplateOutlet`
+
+« Mes réservations » affiche deux sections identiques (« À venir », « Historique ») : un seul fragment `<ng-template #section let-scope>` réutilisé par `<ng-container *ngTemplateOutlet="section; context: { $implicit: 'current' }" />`. Analogie : une vue partielle Razor avec son modèle.
+
+### Questions d'entretien
+
+- **`input()` vs `@Input()` ?** `input()` (Angular 17+) renvoie un **signal** en lecture seule : on le lit `event()` et il s'utilise dans `computed`/`rxResource` ; `@Input()` est une simple propriété.
+- **Comment éviter une requête pour un visiteur ?** `params` qui renvoie `undefined` dans `rxResource`.
+- **Que renvoie `HttpClient` pour un 204 ?** `null`, sans erreur.
+
+### Exercice (facultatif)
+
+Afficher le nombre de demandes « À venir » à côté du lien « Mes réservations » de l'en-tête : un `computed` sur une ressource `list('current', 1)` chargée seulement si l'utilisateur est connecté (même technique que `ContactStore`).
+
+## 18. Réservations côté admin (tâche B) : dialogue avec résultat, état « occupé » par ligne, `@let`
+
+Code : `front/src/app/features/admin/reservations/` (`pending-requests/`, `event-registrants/`, `refuse-dialog.ts`, `admin-reservation-actions.ts`), `core/api/admin-reservations.api.ts`.
+
+### `MatDialog` qui **renvoie** une valeur (dialogue de refus)
+
+- **C'est quoi** : `dialog.open(RefuseDialog)` crée le composant dans une couche au-dessus de la page et renvoie une `MatDialogRef`. Le dialogue se ferme avec `ref.close({ reason })` ; l'écran lit le résultat avec `ref.afterClosed()` (un `Observable` qui émet une seule fois : le résultat, ou `undefined` si l'admin ferme).
+- **Pourquoi** : le dialogue ne connaît pas l'API ; il **rend** le motif, l'écran décide quoi en faire. Même schéma pour « Annuler la réservation » (`ConfirmDialogService`, résultat booléen).
+- **Analogie .NET** : `ShowDialog()` en WinForms/WPF qui renvoie un `DialogResult` ; ou une page Blazor qui attend `await modal.Result`.
+- Dans le composant du dialogue, `inject(MatDialogRef)` (≈ injection par constructeur) donne la référence pour se fermer. En test, on fournit `{ provide: MatDialogRef, useValue: { close: vi.fn() } }` et on vérifie `close` (spec `admin-reservations.spec.ts`).
+
+### Formulaire réactif **typé** d'un seul champ
+
+```ts
+protected readonly reason = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] });
+```
+
+- `nonNullable: true` : la valeur est toujours une `string` (un `reset()` remet `''`, pas `null`) → `reason.value.length` sans `?.`.
+- `[formControl]="reason"` dans le template (pas besoin de `FormGroup` pour un champ). Compteur : `{{ reason.value.length }} / 500` dans un `<mat-hint align="end">`.
+- Double protection : `maxlength` natif (le navigateur bloque la frappe) + `Validators.maxLength` (un collage peut passer) + le serveur (400 `errors.reason`, longueur comptée **après** suppression des espaces).
+
+### État « occupé » **par ligne** : `signal<ReadonlySet<string>>`
+
+```ts
+protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
+this.busyIds.update((ids) => toggled(ids, id, true));   // nouvel ensemble à chaque fois
+```
+
+- **Piège** : `this.busyIds().add(id)` **muterait** l'ensemble sans changer la référence : le signal ne préviendrait personne (égalité par `Object.is`) et le bouton resterait actif. D'où la fonction pure `toggled` qui **copie** l'ensemble.
+- **Analogie .NET** : `ImmutableHashSet<T>` — chaque ajout renvoie une nouvelle instance.
+- Un clic sur la ligne A ne désactive pas la ligne B ; deux clics rapides sur A n'envoient qu'**un** appel (garde `if (busyIds().has(id)) return;` + `[disabled]`).
+
+### Un service d'actions partagé, qui ne lève jamais
+
+`AdminReservationActions.run(reservation, action)` enchaîne « dialogue éventuel → appel HTTP » avec `switchMap` et transforme toute erreur en `{ kind: 'failed', error }` (`catchError`). Les deux pages (« Demandes à traiter », « Inscrits ») n'ont qu'un `subscribe` : succès → message court ; échec → bandeau avec le message de l'API (409 `reservation_state_changed` : « Cette demande a déjà été traitée ou annulée. ») ; dans les deux cas → `resource.reload()` pour afficher le statut réel.
+
+### Compteur du menu : un store singleton
+
+`PendingCountStore` (`providedIn: 'root'`) garde `count = signal<number | null>`. `AdminLayout` l'affiche via un `computed` (« Demandes (3) » ou « Demandes ») et appelle `refresh()` à sa création ; les pages appellent `refresh()` après chaque action. `refresh()` fait `GET .../pending?pageSize=1` : on ne lit que `totalCount`.
+
+### `@let` et `ng-template` avec plusieurs variables
+
+- `@let data = registrants.value();` déclare une variable locale de template (Angular 18.1+), ≈ `@{ var data = Model.X; }` en Razor.
+- `<ng-template #rows let-items let-group="group">` : `$implicit` → `items`, et une variable nommée `group`. Le contexte d'un template n'est **pas typé** : on redonne le type par une petite méthode (`asRows(items)`) pour que la vérification stricte du template reste active.
+
+### Données personnelles côté front
+
+Les coordonnées des inscrits ne vivent **que** dans la valeur de la ressource (mémoire). Rien dans `localStorage`/`sessionStorage` (test : `localStorage.length === 0` après affichage). L'API les sert en `Cache-Control: no-store` : le navigateur ne les écrit pas sur disque.
+
+### Page vidée dont l'état est dans l'URL : `computed` + `effect` qui **navigue**
+
+« Demandes à traiter » garde `?page=` dans l'URL (contrairement au § 17, signal local). Un `computed` calcule la dernière page valide quand la page revient vide alors que `totalCount > 0` ; un `effect` appelle `router.navigate([], { queryParams: { page }, replaceUrl: true })`. Règle : la **valeur** dans un `computed`, l'**effet de bord** (navigation) dans un `effect`. `replaceUrl` : le bouton Précédent ne ramène pas à la page vide. Garde-fou `lastPage < page` : jamais de navigation vers la même URL (sinon chargement sans fin).
+
+### Noms accessibles des boutons répétés
+
+Dix lignes = dix boutons « Confirmer » identiques pour un lecteur d'écran. `[attr.aria-label]="'Confirmer — ' + nom"` (`attr.` lie l'**attribut** HTML, et le retire si la valeur vaut `null` ; forme historique, toujours valable). Le texte visible reste **en tête** du nom (WCAG 2.5.3) pour la commande vocale ; un lien `target="_blank"` annonce « (nouvel onglet) ». Fonctions dans `reservations/row-labels.ts`.
+
+### Questions d'entretien
+
+- **`computed` ou `effect` ?** `computed` pour dériver une valeur (pur, mémorisé, paresseux) ; `effect` pour agir sur l'extérieur (navigation, stockage, log). Dériver une valeur dans un `effect` + `set()` est un anti-pattern.
+- **Comment récupérer une valeur saisie dans un `MatDialog` ?** `dialogRef.afterClosed()` émet la valeur passée à `close(...)` (ou `undefined`).
+- **Pourquoi un signal ne voit-il pas `set.add(x)` ?** Il compare les références (`Object.is`) ; il faut créer un nouvel objet (`new Set(old)`), ou fournir une fonction `equal`.
+- **Où mettre une valeur partagée par le menu et des pages chargées à la demande ?** Dans un service `providedIn: 'root'` qui expose un signal en lecture seule (`asReadonly()`).
+
+### Exercice (facultatif)
+
+Dans « Inscrits », mettre à jour la ligne **sans relire toute la liste** après un succès : remplacer l'élément par la réponse de l'API (`AdminReservationDto`) et le déplacer dans le bon groupe selon son `status` (indice : `registrants.update(...)`), puis comparer avec la solution actuelle (`reload()`) en nombre d'appels et en simplicité.

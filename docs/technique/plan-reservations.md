@@ -2,7 +2,7 @@
 
 > Rédigé par l'agent `architecte` le 24/11/2026. Destinataires : `expert-technique` (tâches § 11), `testeur` (§ 9), `code-reviewer`, `expert-fonctionnel` (§ 15), porteur.
 > Références : cahier des charges v1.3 (§ 4.1, § 5.1, RG-01 à RG-08, RG-10, RG-12, § 6.4) ; `fonctionnel/mvp.md` v4 (US-C2, US-D1 à D5, US-E4 à E7 ; R1 à R10, R13, R24) ; `architecture.md` v8 ; ADR 0004, 0005, 0006, 0007, 0012, 0013 ; **nouveaux ADR 0018 à 0021**.
-> Statut : **proposé**. Les valeurs par défaut du § 15 permettent de commencer ; aucune ne change le périmètre du cahier.
+> Statut : **accepté** (porteur, 24/11/2026 : valeurs par défaut P-R1 à P-R8 retenues ; ADR 0004 à 0006 et 0018 à 0021 acceptés). **Tâche A réalisée le 24/11/2026** (état : `etat-avancement.md`).
 
 ---
 
@@ -138,9 +138,9 @@ Migration : `dotnet ef migrations add AddReservations`, puis **relire le script*
 | `Reservations/ReservationRules.cs` | `ComputeExpiresAt(requestedAt, lifetime, startsAt)`, constantes (motif ≤ 500), messages français |
 | `Events/Event.cs` | `EnsureCanAcceptRequest(now, occupancy)` |
 | `Common/BusinessRuleException.cs` | propriété facultative `Details` |
-| `Common/ErrorCodes.cs` | `event_full`, `reservations_closed`, `already_reserved`, `reservation_state_changed`, `cancellation_deadline_passed`, `reservation_not_confirmed`, `payment_not_applicable` |
+| `Common/ErrorCodes.cs` | `event_full`, `reservations_closed`, `already_reserved`, `reservation_state_changed`, `cancellation_deadline_passed`, `reservation_not_confirmed`, `payment_not_applicable` ; réutilisés : `event_cancelled` (demande sur un événement annulé : « Cet événement a été annulé. »), `event_ended` (annulation par l'admin après la fin : « Cet événement est terminé : la réservation ne peut plus être annulée. »), `not_found` |
 
-Messages (à valider dans `libelles-ecrans.md`, § 15) : « Événement complet », « Les réservations sont closes », « Vous avez déjà une demande en cours ou une réservation pour cet événement », « Le délai d'annulation est dépassé : contactez l'association », « Confirmez d'abord la demande avant de la marquer payée », « Cet événement est gratuit : aucun paiement à enregistrer », « Cette demande a expiré : le membre doit faire une nouvelle demande. », « Cette demande a déjà été traitée ou annulée. »
+Messages (validés dans `libelles-ecrans.md` v1.1 § 11 ; côté membre, une demande expirée donne « Votre demande a expiré. Vous pouvez en faire une nouvelle. ») : « Événement complet », « Les réservations sont closes », « Vous avez déjà une demande en cours ou une réservation pour cet événement », « Le délai d'annulation est dépassé : contactez l'association », « Confirmez d'abord la demande avant de la marquer payée », « Cet événement est gratuit : aucun paiement à enregistrer », « Cette demande a expiré : le membre doit faire une nouvelle demande. », « Cette demande a déjà été traitée ou annulée. »
 
 ---
 
@@ -171,13 +171,13 @@ Infrastructure :
 - `Persistence/Configurations/ReservationConfiguration.cs`, `AppDbContext` (`DbSet`), migration `AddReservations` ;
 - `Persistence/EventLock.cs` : traduction `DbUpdateException` unique → `UniqueConstraintViolationException` sans `InnerException` ;
 - `Identity/IdentityService.cs` (B) : `GetContactsAsync` ;
-- `Jobs/ExpirePendingReservationsJob.cs`, `Jobs/ApiActivity.cs` (C) ; `DependencyInjection.cs` : options `Reservations` (`ValidateOnStart`), `AddHostedService` si `Enabled`.
+- `Jobs/ExpirePendingReservationsJob.cs`, `Jobs/ApiActivity.cs` (C) ; `DependencyInjection.cs` : options `Reservations` (`ValidateOnStart`), `AddHostedService` toujours appelé, `Enabled` lu dans `StartAsync` (écart T-C2, ADR 0020 « Mise en œuvre »).
 
 API :
 - `Controllers/MyReservationsController.cs` (A), `Controllers/AdminReservationsController.cs` (B), routes de repli pour identifiant mal formé (comme `AdminEventsController.MalformedId`, D1) ;
 - `Errors/ApiExceptionHandler.cs` : recopie `BusinessRuleException.Details` dans les extensions ;
 - filtre `NoStore` (`Cache-Control: no-store`) sur les contrôleurs `/api/me` et `/api/admin` ;
-- middleware d'activité (C) : `ApiActivity.Touch()` pour les chemins `/api/` (pas `/health`).
+- middleware d'activité (C) : `ApiActivity.RecordRequest()` lève un drapeau (consommé par le job, `TryConsume`) après une réponse `/api/` de code < 400 (pas `/health`, pas les 401/404 d'un robot) ; écart T-C1, ADR 0020 « Mise en œuvre ».
 
 ---
 

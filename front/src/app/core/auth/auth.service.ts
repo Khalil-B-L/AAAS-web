@@ -28,7 +28,7 @@ export const EXPIRED_REASON = 'expiree';
 /** Marge retirée à la durée de vie du jeton : on se déconnecte un peu avant que l'API ne refuse le jeton. */
 const SAFETY_MARGIN_MS = 60_000;
 /** Préfixes des pages qui exigent une session (authGuard / adminGuard). */
-const PROTECTED_PREFIXES = ['/mon-compte', '/admin'];
+const PROTECTED_PREFIXES = ['/mon-compte', '/mes-reservations', '/admin'];
 /** setTimeout n'accepte pas plus de 2^31 − 1 ms (environ 24 jours). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 

@@ -7,7 +7,7 @@ import { DEFAULT_AFTER_LOGIN } from './return-url';
 // comme un [Authorize] qui serait vérifié par le serveur et seulement « mimé » par le client.
 // Un guard renvoie true (navigation autorisée) ou un UrlTree (redirection), jamais de navigate() + false.
 
-/** Pages membres (/mon-compte, plus tard /mes-reservations) : non connecté → connexion avec retour. */
+/** Pages membres (/mon-compte, /mes-reservations) : non connecté → connexion avec retour. */
 export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
   return auth.isLoggedIn() || loginTree(inject(Router), state.url);

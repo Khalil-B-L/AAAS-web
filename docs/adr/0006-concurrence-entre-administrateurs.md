@@ -1,6 +1,6 @@
 # ADR 0006 — Concurrence entre administrateurs (et avec le membre)
 
-- **Statut** : Proposé (à valider par le porteur)
+- **Statut** : Accepté (porteur, 24/11/2026)
 - **Date** : 10/11/2026
 - **Références** : mvp US-E6 (« déjà traitée par un autre admin »), US-E2, US-E8, US-D3, US-D5
 

@@ -50,6 +50,19 @@ internal sealed class FakeIdentityService : IIdentityService
 
     public Task<bool> IsSecurityStampValidAsync(Guid userId, string securityStamp, CancellationToken cancellationToken) =>
         Task.FromResult(true);
+
+    public Dictionary<Guid, MemberContact> Contacts { get; } = [];
+
+    public int GetContactsCalls { get; private set; }
+
+    public Task<IReadOnlyDictionary<Guid, MemberContact>> GetContactsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
+    {
+        GetContactsCalls++;
+        IReadOnlyDictionary<Guid, MemberContact> found = userIds.Distinct()
+            .Where(Contacts.ContainsKey)
+            .ToDictionary(id => id, id => Contacts[id]);
+        return Task.FromResult(found);
+    }
 }
 
 internal sealed class FakeTokenService : ITokenService

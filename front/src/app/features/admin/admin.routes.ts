@@ -22,6 +22,19 @@ export const ADMIN_ROUTES: Routes = [
         loadComponent: () => import('./events/admin-event-form/admin-event-form').then((m) => m.AdminEventForm),
       },
       {
+        // Déclarée AVANT « evenements/:id » : même préfixe, la plus précise d'abord.
+        path: 'evenements/:id/inscrits',
+        title: 'Inscrits',
+        loadComponent: () =>
+          import('./reservations/event-registrants/event-registrants').then((m) => m.EventRegistrants),
+      },
+      {
+        path: 'demandes',
+        title: 'Demandes à traiter',
+        loadComponent: () =>
+          import('./reservations/pending-requests/pending-requests').then((m) => m.PendingRequests),
+      },
+      {
         path: 'evenements/:id',
         title: "Modifier l'événement",
         canDeactivate: [unsavedChangesGuard],

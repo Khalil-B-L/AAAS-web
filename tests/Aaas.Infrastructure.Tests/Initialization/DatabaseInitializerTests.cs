@@ -512,6 +512,7 @@ public sealed class DatabaseInitializerTests : IDisposable
         public Task<UserAccount?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task RecordLoginAsync(Guid userId, DateTimeOffset loggedInAt, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<bool> IsSecurityStampValidAsync(Guid userId, string securityStamp, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyDictionary<Guid, MemberContact>> GetContactsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     /// <summary>Magasin Identity jamais utilisé (les managers surchargent toutes les méthodes appelées) : toute utilisation échoue.</summary>

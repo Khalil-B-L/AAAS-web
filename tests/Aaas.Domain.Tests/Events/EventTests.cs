@@ -266,6 +266,21 @@ public class EventTests
         Assert.False(published.IsBookable(Now, new EventOccupancy(0, published.Capacity)));
     }
 
+    [Fact(DisplayName = "EnsureCanAcceptRequest : publié à venir OK ; brouillon et commencé → reservations_closed ; complet → event_full")]
+    public void Ensure_can_accept_request_matches_bookability()
+    {
+        var published = Published(Details(capacity: 3));
+        published.EnsureCanAcceptRequest(Now, new EventOccupancy(1, 1));
+
+        Assert.Equal(ErrorCodes.ReservationsClosed, Rejected(() => Draft().EnsureCanAcceptRequest(Now, EventOccupancy.None)).Code);
+        Assert.Equal(ErrorCodes.ReservationsClosed, Rejected(() => published.EnsureCanAcceptRequest(published.StartsAt, EventOccupancy.None)).Code);
+        Assert.Equal(ErrorCodes.EventFull, Rejected(() => published.EnsureCanAcceptRequest(Now, new EventOccupancy(2, 1))).Code);
+
+        // Même règle que IsBookable (R2) : réservable ⇔ aucune exception.
+        Assert.False(published.IsBookable(Now, new EventOccupancy(2, 1)));
+        Assert.True(published.IsBookable(Now, new EventOccupancy(1, 1)));
+    }
+
     [Fact(DisplayName = "Commencé / terminé : calculés à partir de now (bornes incluses)")]
     public void Started_and_ended_are_computed()
     {

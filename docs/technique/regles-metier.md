@@ -2,7 +2,7 @@
 
 > Tenu par l'agent `expert-technique`. Pour chaque règle : ce qui est appliqué, et **où** dans le code.
 > Références : `docs/cahier-des-charges.md` (RG-xx), `docs/fonctionnel/mvp.md` (R-xx, US-xx), `docs/adr/`.
-> État : **étape 2 + front S2** (comptes ; événements côté admin et consultation publique ; numéro de contact ; écrans correspondants). Les règles des réservations et des actualités seront ajoutées aux étapes suivantes. Ce que le front reprend ou affiche : § 6.
+> État : **réservations, tâche B** (24/11/2026) : comptes ; événements ; numéro de contact ; demande, suivi et annulation d'une place par le membre ; traitement par l'admin (confirmer, refuser, annuler, « Payée », inscrits) (§ 3 bis), avec leurs écrans. Expiration périodique (tâche C) : livrée le 24/11/2026. Actualités : à venir. Ce que le front reprend ou affiche : § 6.
 
 ## 1. Comptes et authentification
 
@@ -37,7 +37,7 @@ Données conservées pour un compte (R20, § 6.4) : prénom, nom, e-mail, télé
 |---|---|---|
 | Durée de session | Jeton valable **60 minutes** (`Jwt:LifetimeMinutes`), sans renouvellement automatique. Ensuite : **401**, le front renvoie vers la connexion. | `TokenService`, `JwtOptions` |
 | Révocation immédiate | À chaque requête authentifiée, le *security stamp* du jeton est comparé à celui de la base. Compte supprimé ou stamp renouvelé (changement de rôle) : **401** immédiat. | `JwtAuthenticationExtensions.ValidateSecurityStampAsync` → `IdentityService.IsSecurityStampValidAsync` |
-| Sécurisé par défaut | Tout endpoint exige un jeton valide, sauf ceux marqués explicitement anonymes (`/api/auth/*`, `/health`, `/health/ready` ; `/openapi/v1.json` en Development seulement). Un chemin inconnu renvoie **401** `unauthorized` (et non 404) à un anonyme. | Politique de repli (`SetFallbackPolicy`) dans `JwtAuthenticationExtensions` |
+| Sécurisé par défaut | Tout endpoint exige un jeton valide, sauf ceux marqués explicitement anonymes (`/api/auth/*`, `/health`, `/health/ready` ; `/openapi/v1.json` en Development seulement). Un chemin inconnu renvoie **401** `unauthorized` (et non 404) à un anonyme ; ces réponses ne comptent pas comme activité pour la tâche d'expiration (§ 3 bis, ADR 0020 § 4). | Politique de repli (`SetFallbackPolicy`) dans `JwtAuthenticationExtensions` |
 | Contenu du jeton | Identifiant, prénom, rôles, security stamp. Ni e-mail ni téléphone. | `TokenService.CreateAccessToken` |
 
 ### 1.4 Administrateurs (R22, RG-09, ADR 0008)
@@ -94,7 +94,7 @@ stateDiagram-v2
 | Supprimer | brouillon **jamais publié** (`FirstPublishedAt` nul) : il n'a jamais pu recevoir de réservation (R15 étape 2, RG-07). Suppression définitive | `event_already_published` (publié, annulé, ou publié puis dépublié) | `Event.EnsureCanBeDeleted`, `EventRules.CanBeDeleted` ; `AdminEventService.DeleteAsync` |
 | Modifier | ni annulé ni terminé ; **un événement commencé reste modifiable** (R28, RG-12) | `event_cancelled`, `event_ended`, puis R11, R12 (§ 3.3) | `Event.EnsureCanBeEdited`, `Event.Update` ; `AdminEventService.UpdateAsync` (sous verrou) |
 
-Pourquoi `FirstPublishedAt` : la dépublication remet `PublishedAt` à vide ; sans marqueur persistant, un événement publié puis dépublié ressemblerait à un brouillon jamais publié. Or des membres ont pu le voir (et, à partir de l'étape 4, y réserver). La suppression d'un événement publié sans aucune réservation arrivera à l'étape 7 (US-E3, Q29).
+Pourquoi `FirstPublishedAt` : la dépublication remet `PublishedAt` à vide ; sans marqueur persistant, un événement publié puis dépublié ressemblerait à un brouillon jamais publié. Or des membres ont pu le voir et y réserver. La suppression d'un événement publié sans aucune réservation arrivera à l'étape 7 (US-E3, Q29).
 
 ### 3.2 Valeurs saisies (RG-13, R28, R29, RG-08)
 
@@ -114,7 +114,7 @@ Filets en base (contraintes `CHECK`, une écriture qui contournerait le Domain �
 
 | Règle | Comportement | Où |
 |---|---|---|
-| Places occupées | demandes en attente non échues + réservations confirmées. **Étape 2 : toujours 0** (la table des réservations arrive à l'étape 4) | `EventOccupancyReader` (seul endroit qui compte ; à modifier à l'étape 4) |
+| Places occupées | demandes en attente **non échues** + réservations confirmées, comptées en **une** requête SQL pour toute une page d'événements (pas de N+1) ; jamais stockées | `EventOccupancyReader` (seul endroit qui compte), filtre `ReservationQueries.IsActive` |
 | R7 places restantes | capacité − places occupées, jamais négatif ; « Complet » si toutes occupées | `EventRules.RemainingSeats`, `EventRules.IsFull` |
 | R2 réservable | publié, pas commencé, pas complet (annulé ou brouillon : jamais) | `EventRules.IsBookable` |
 | R11 capacité | la capacité ne peut pas descendre sous les places occupées : 409 `capacity_below_reserved` avec le décompte (« 15 places sont déjà occupées (10 confirmées, 5 en attente)… ») | `Event.Update` |
@@ -122,7 +122,7 @@ Filets en base (contraintes `CHECK`, une écriture qui contournerait le Domain �
 | Priorité | R11 est vérifiée avant R12 : une capacité trop basse est refusée même si l'avertissement est confirmé | `Event.Update` |
 | R14 dépublication | refusée s'il reste une demande en attente ou une réservation confirmée ; proposer d'annuler à la place | `Event.Unpublish` |
 
-**Verrou** : modifier et dépublier prennent un verrou SQL sur la ligne de l'événement (`UPDLOCK`, dans une transaction) avant de compter les places, pour qu'une demande de place (étape 4) ne puisse pas s'intercaler (ADR 0004, 0012). La publication et la suppression d'un brouillon n'en ont pas besoin (aucune réservation possible).
+**Verrou** : modifier et dépublier prennent un verrou SQL sur la ligne de l'événement (`UPDLOCK`, dans une transaction) avant de compter les places, pour qu'une demande de place ne puisse pas s'intercaler (ADR 0004, 0012). Si le **début** change, l'échéance des demandes en attente non échues est recalculée sous ce même verrou (§ 3 bis). La publication et la suppression d'un brouillon n'en ont pas besoin (aucune réservation possible).
 
 **Concurrence entre admins** (ADR 0006) : la fiche admin porte une `version` ; une modification avec une version périmée → 409 `concurrent_update`, rien n'est écrit. Publier, dépublier, supprimer sont des actions sans `version` : la règle de transition suffit, et une écriture simultanée est arrêtée par le `rowversion` (409 `concurrent_update`).
 
@@ -136,6 +136,89 @@ Filets en base (contraintes `CHECK`, une écriture qui contournerait le Domain �
 | Mention affichée (front) | priorité : Annulé > Terminé > Réservations closes > Complet > « N places restantes » | DTO `status`, `hasEnded`, `hasStarted`, `isFull` |
 
 Liste admin : tous statuts ; filtre `status` ; `period` = à venir (non terminés, défaut), passés, tous. Où : `AdminEventService.ListAsync`, `EventQueries.InPeriod`.
+
+## 3 bis. Réservations (US-D1 à D5, RG-02 à RG-05, ADR 0004, 0005, 0018, 0019, 0021)
+
+Code : entité `Reservation`, `ReservationStatus`, `ReservationRules` — `src/Aaas.Domain/Reservations/` ; `Event.EnsureOpenForRequests` / `EnsureCanAcceptRequest` — `src/Aaas.Domain/Events/Event.cs` ; cas d'usage `MemberReservationService`, `ReservationExpiryService`, `ReservationQueries` — `src/Aaas.Application/Reservations/` ; délais `ReservationOptions` — `src/Aaas.Application/Options/` ; table `ReservationConfiguration` — `src/Aaas.Infrastructure/Persistence/Configurations/`.
+
+État au 24/11/2026 : **tâches A et B** livrées (demander, suivre, annuler par le membre ; confirmer, refuser, annuler par l'admin, « Payée », inscrits). Écriture automatique de « Expirée » par une tâche périodique : **tâche C, livrée le 24/11/2026** (l'exactitude n'en dépend pas, voir « Statut effectif »). Traitement admin : `AdminReservationService` (`src/Aaas.Application/Reservations/`), `AdminReservationsController`.
+
+### Statuts (valeurs stockées, figées)
+
+| Valeur | Statut | Libellé membre | Libellé admin | Occupe une place |
+|---|---|---|---|---|
+| 1 | `Pending` En attente | « En attente de confirmation » | « En attente » | oui, **tant que l'échéance n'est pas atteinte** |
+| 2 | `Confirmed` Confirmée | « Confirmée » | « Confirmée » | oui |
+| 3 | `Refused` Refusée | « Refusée » | « Refusée » | non |
+| 4 | `Expired` Expirée | « Expirée » | « Expirée » | non |
+| 5 | `CancelledByUser` Annulée par le membre | « Annulée par vous » | « Annulée par le membre » | non |
+| 6 | `CancelledByAssociation` Annulée par l'association | « Annulée par l'association » | idem | non |
+
+Une ligne = une demande = **une place** (pas d'accompagnant). Un membre peut avoir **plusieurs lignes** pour un même événement (refusée puis nouvelle demande…) mais **une seule active** (1 ou 2).
+
+### Cycle de vie
+
+```
+                 demande (sous verrou)
+   (aucune) ─────────────────────────────► En attente ──── échéance atteinte ───► Expirée
+                                              │  │  │                       (statut effectif immédiat ;
+                                              │  │  ├── le membre annule ──► Annulée par le membre
+                                              │  │  │                              écrite plus tard)
+                                              │  │  ├── l'admin refuse (motif facultatif) ──► Refusée
+                                              │  │  └── l'admin annule ──► Annulée par l'association
+                                              │  └── l'admin confirme ──► Confirmée
+                                              │                              │  │
+                                              │   le membre annule jusqu'à   │  └── l'admin annule avant la fin
+                                              │   début − 24 h ◄─────────────┘      ──► Annulée par l'association
+   « Payée » : mention (pas un statut), posée sur une Confirmée d'un événement payant, conservée si elle est
+   ensuite annulée, retirable quel que soit le statut.
+```
+
+Tableau complet « 6 statuts × 7 actions » (permis, sans effet, refusé avec quel code) : `tests/Aaas.Domain.Tests/Reservations/ReservationAdminTests.cs` (`Transition_table`).
+
+### Règles
+
+| Règle | Comportement | Où |
+|---|---|---|
+| Demande (US-D1) | un membre connecté (ou un admin pour lui-même) demande une place ; elle est créée **En attente** et **bloque une place** | `Reservation.Request`, `MemberReservationService.RequestAsync` |
+| Ordre des refus | événement inconnu ou **brouillon** → 404 « Contenu introuvable. » (on ne révèle pas un brouillon) ; **annulé** → `event_cancelled` ; **commencé ou terminé** → `reservations_closed` ; **déjà une demande active** → `already_reserved` (avec `reservationId`) ; **complet** → `event_full`. Un membre déjà inscrit à un événement complet apprend donc qu'il est inscrit | `Event.EnsureOpenForRequests`, `Reservation.Request`, `Event.EnsureCanAcceptRequest` |
+| RG-02 capacité, jamais dépassée | la demande s'exécute dans une transaction qui **verrouille la ligne de l'événement** (`UPDLOCK, ROWLOCK`) ; l'heure (`now`) est lue **après** l'obtention du verrou ; le décompte se fait ensuite. Deux demandes sur le même événement passent donc l'une après l'autre ; les lectures publiques ne sont pas bloquées | `EventLock` (Infrastructure), `MemberReservationService.RequestAsync` |
+| RG-03 une seule active | contrôlée sous verrou (Domain), puis garantie en base par l'index unique filtré `UX_Reservations_Event_User_Active (EventId, UserId) WHERE Status IN (1, 2) AND UserId IS NOT NULL`. Une violation de l'index (script, bug) devient aussi `already_reserved`, sans message SQL | `ReservationConfiguration`, `EventLock.SaveChangesTranslatingUniqueViolationAsync` |
+| RG-04 échéance | `ExpiresAt = min(demande + 48 h, début de l'événement)`, calculée à la demande et **stockée** | `ReservationRules.ComputeExpiresAt` |
+| Statut effectif | une demande En attente dont l'échéance est **atteinte** (`now >= ExpiresAt`) **est** Expirée : elle ne compte plus dans les places, s'affiche « Expirée » partout et ne se confirme plus, **même si la base dit encore 1**. Toutes les réponses exposent ce statut effectif | `Reservation.EffectiveStatus`, `Reservation.IsActive`, `ReservationQueries.IsActive` (même règle en SQL, test de concordance) |
+| Écriture de « Expirée » | avant chaque nouvelle demande sur un événement, sous le verrou, les demandes échues **de cet événement** sont écrites Expirée (`UPDATE` en une requête) : cela libère l'index unique pour que le membre puisse redemander. **Tâche de fond** (tâche C) : toutes les 5 min, les demandes échues de **tous** les événements sont écrites Expirée, en une requête idempotente (`WHERE Status = 1`), **seulement si l'API a répondu avec succès (code < 400) à une requête `/api/` depuis le passage précédent** (pour laisser dormir Azure SQL serverless : ni les sondes `/health`, ni les 401/404 d'un robot ne comptent) ; une confirmation concurrente sur une ligne touchée échoue en `reservation_state_changed` (`rowversion`). Rien n'est envoyé au membre | `ReservationExpiryService.ExpireDueForEventAsync` ; `ReservationExpiryService.ExpireDueAsync`, `ExpirePendingReservationsJob`, `ApiActivity` (`src/Aaas.Infrastructure/Jobs/`), `ApiActivityMiddleware` |
+| Début de l'événement déplacé (RG-12) | quand un admin change le **début**, sous le verrou de la modification, chaque demande En attente **non échue** reprend `min(demande + 48 h, nouveau début)` : ramenée si le début avance, allongée (sans dépasser 48 h après la demande) s'il recule. Une demande échue n'est **jamais ranimée** ; une confirmée n'est pas touchée. L'heure (`now`) de la modification est lue **après** l'obtention du verrou (une modification qui a attendu ne décide pas avec une heure périmée) et sert aussi à la réponse. Si un membre annule une des demandes lues entre la lecture et l'enregistrement, la modification est **rejouée une fois** sur des données relues (pas de `concurrent_update` : la fiche de l'admin n'est pas périmée) ; un second conflit donne `concurrent_update`. Le délai de 24 h se mesure toujours par rapport au début **actuel** | `Reservation.RescheduleDeadline`, `AdminEventService.UpdateAsync` |
+| Annulation par le membre (US-D3) | En attente non échue : à tout moment. Confirmée : jusqu'à **début − 24 h, borne incluse** (exactement 24 h avant : accepté ; 24 h − 1 s : `cancellation_deadline_passed`, le membre doit contacter l'association). Déjà annulée, refusée ou expirée : `reservation_state_changed` avec `currentStatus`. La mention « Payée » est conservée (remboursement hors application) | `Reservation.CancelByUser`, `MemberReservationService.CancelAsync` |
+| Annulation sans verrou | annuler ne peut que libérer une place : pas de verrou ; une écriture concurrente est détectée par la `rowversion`. Si elle a changé le **statut effectif** (admin qui confirme, refuse, tâche d'expiration) → `reservation_state_changed` avec le statut relu. Sinon (échéance recalculée par un changement de date) → la règle d'annulation est **réappliquée une fois** sur la ligne relue : 200 si elle est toujours annulable ; un second conflit → `reservation_state_changed` | `MemberReservationService.CancelAsync` (ADR 0006, 0019 § 5) |
+| `canCancel`, `cancellableUntil` | calculés par l'API (le front ne compare jamais l'heure du poste) : échéance pour une demande en attente, début − 24 h pour une confirmée | `Reservation.CanBeCancelledByUser`, `Reservation.CancellableUntil` |
+| Mes réservations (US-D2) | « À venir » = active **et** événement non terminé (un événement en cours reste « À venir »), par début croissant ; « Historique » = le reste, par début décroissant | `ReservationQueries.IsCurrentForMember`, `MemberReservationService.ListAsync` |
+| « Ma demande » sur le détail | la plus récente du membre pour cet événement (active ou non), ou rien (204) ; le détail public reste identique pour tous | `MemberReservationService.GetForEventAsync` |
+| Confidentialité | un membre ne voit **que** ses réservations : l'identifiant vient du jeton ; celle d'un autre → 404. Réponses `/api/me` et `/api/admin` en `Cache-Control: no-store`. Journaux : aucun e-mail, téléphone, nom ni motif (seulement des GUID et des nombres) | `MyReservationsController`, `NoStoreMiddleware` (ADR 0021) |
+| Numéro à contacter (US-D4) | affiché au membre avec sa demande ; lu dans les paramètres de l'association, jamais recopié dans la réservation | front : `ContactStore` ; API : `GET /api/settings/contact` |
+| Confirmer (US-E6) | admin seulement ; En attente **non échue** → Confirmée (`DecidedAt`). Une demande échue (même non encore écrite) ne se confirme plus : `reservation_state_changed`, `currentStatus: "Expired"`, message admin « Cette demande a expiré : le membre doit faire une nouvelle demande. » ; comme l'échéance ne dépasse jamais le début, un événement commencé n'a plus rien à confirmer. Places inchangées. L'admin qui confirme n'est **pas** enregistré (P-R6) | `Reservation.Confirm`, `AdminReservationService.ConfirmAsync` |
+| Refuser (US-E6) | En attente non échue → Refusée ; motif **facultatif**, espaces retirés, vide → aucun motif, **500 caractères au plus** (après retrait des espaces ; 400 `errors.reason` sinon). Le motif est visible du membre ; le dialogue rappelle de ne pas y mettre de données personnelles. Place libérée ; le membre peut redemander | `Reservation.Refuse`, `ReservationRules.NormalizeRefusalReason`, `AdminReservationService.RefuseAsync` |
+| Annulation par l'association (US-E5) | En attente non échue ou Confirmée → Annulée par l'association, **sans délai** (contrairement au membre) tant que l'événement **n'est pas terminé** (pendant l'événement : accepté ; à l'heure de fin ou après : `event_ended`). « Payée » conservée. L'application n'envoie aucun message : l'admin prévient la personne par téléphone | `Reservation.CancelByAssociation`, `AdminReservationService.CancelAsync` |
+| « Payée » (US-E7, RG-08) | posée **seulement** sur une Confirmée d'un événement **payant**, à tout moment (même après la fin) ; enregistre la date et **l'admin** (seule trace d'un admin sur une réservation, R13). Ordre des refus : statut final → `reservation_state_changed` ; gratuit → `payment_not_applicable` ; en attente → `reservation_not_confirmed`. Déjà payée → sans effet (date et admin d'origine gardés). Retrait possible **quel que soit le statut**, y compris annulée (QF-5) | `Reservation.MarkPaid`, `Reservation.UnmarkPaid`, `AdminReservationService` |
+| Boutons de l'admin | `actions` de chaque ligne calculées par le Domain avec les mêmes règles (sans exception) : confirmer/refuser si en attente non échue ; annuler si active et événement non terminé ; marquer payée si confirmée, payant, non payée ; retirer si payée. Le serveur revérifie toujours | `Reservation.AdminActions` |
+| Deux acteurs en même temps (US-E6, ADR 0006, 0019 § 5) | aucune action admin ne prend le verrou de l'événement ; la `rowversion` de la réservation arrête la seconde écriture : si le **statut effectif** a changé (autre admin, membre, expiration) → 409 `reservation_state_changed` + `currentStatus`, message « Cette demande a déjà été traitée ou annulée. » (ou le message « expirée » ci-dessus) ; sinon (échéance recalculée, « Payée » posée par un autre) → action réappliquée une fois sur la ligne relue ; un second conflit d'affilée → 409 `concurrent_update` (et non « déjà traitée », qui serait faux). Exception : **retirer « Payée »**, permis dans tous les statuts, est réappliqué même si le statut a changé (ex. le membre annule au même instant → 200, Annulée par le membre, non payée) | `AdminReservationService.TransitionAsync` (paramètre `reapplyIfStatusChanged`) |
+| Pagination « Demandes à traiter » (front) | si la page affichée revient vide alors qu'il reste des demandes (dernière ligne de la dernière page traitée, `?page=` trop grand), l'écran passe à la dernière page existante sans ajouter d'entrée d'historique | `pending-requests.ts` (`lastPageIfOutOfRange`) |
+| Demandes à traiter (US-E6) | en attente non échues, tous événements, **échéance la plus proche d'abord** ; `totalCount` = compteur du menu « Demandes (N) » | `AdminReservationService.ListPendingAsync` |
+| Inscrits d'un événement (US-E4) | non paginé ; en attente (plus ancienne d'abord), confirmées (**nom puis prénom**, insensible à la casse, comptes supprimés à la fin), autres (plus récente demande d'abord) ; total « occupées / capacité (confirmées, en attente) » calculé sur le statut effectif ; compte supprimé → « Compte supprimé » sans coordonnées ; admin « Payée » supprimé → « un administrateur supprimé » | `AdminReservationService.GetEventRegistrantsAsync` |
+| Coordonnées vues par l'admin (RG-15, ADR 0021) | prénom, nom, téléphone, e-mail des inscrits, **seulement** dans `/api/admin/...` (`AdminOnly`, `no-store`), lues en **une requête** par écran ; jamais journalisées, jamais stockées par le front hors mémoire | `IIdentityService.GetContactsAsync` (`IdentityService`, Infrastructure) |
+
+### Délais (configuration, P-R4)
+
+| Clé (`appsettings.json`, section `Reservations`) | Défaut | Bornes vérifiées au démarrage |
+|---|---|---|
+| `PendingLifetime` | `2.00:00:00` (48 h) | 1 minute à 30 jours |
+| `ConfirmedCancellationDeadline` | `1.00:00:00` (24 h) | 0 à 30 jours |
+| `ExpirationJob:Enabled` / `Interval` / `OnlyWhenActive` | `true` / `00:05:00` / `true` | intervalle : 1 min à 1 h |
+
+Non modifiables depuis l'interface au MVP. Variables d'environnement : `Reservations__PendingLifetime`, `Reservations__ConfirmedCancellationDeadline`, `Reservations__ExpirationJob__Interval`... (`exploitation.md` § 4 et § 8 bis).
+
+### Filets en base (table `Reservations`)
+
+`CK_Reservations_Status` (1 à 6), `CK_Reservations_Deadline` (`ExpiresAt > RequestedAt`), `CK_Reservations_Paid` (« Payée » seulement si statut 2, 5 ou 6), `CK_Reservations_PaidAt` ; clés étrangères vers `Events` et `AspNetUsers` en `NO ACTION` (un événement ou un compte référencé ne disparaît pas en cascade).
 
 ## 4. Numéro de contact de l'association (US-E8, RG-10, RG-11, R8)
 
@@ -167,16 +250,23 @@ Liste admin : tous statuts ; filtre `status` ; `period` = à venir (non terminé
 | `internal_error` | 500 | Erreur inattendue |
 | `concurrent_update` | 409 | La fiche a été modifiée par un autre admin depuis sa lecture : recharger (étape 2) |
 | `event_state_changed` | 409 | Publier un événement déjà publié, dépublier un brouillon : recharger |
-| `event_cancelled` | 409 | Action impossible sur un événement annulé |
+| `event_cancelled` | 409 | Action impossible sur un événement annulé ; demande de place sur un événement annulé (« Cet événement a été annulé. ») |
 | `event_started` | 409 | Publication d'un événement déjà commencé |
-| `event_ended` | 409 | Modification d'un événement terminé |
+| `event_ended` | 409 | Modification d'un événement terminé ; annulation d'une réservation par l'admin après la fin de l'événement (« Cet événement est terminé : la réservation ne peut plus être annulée. ») |
 | `event_has_active_reservations` | 409 | Dépublication avec des demandes en attente ou réservations confirmées (R14) |
 | `capacity_below_reserved` | 409 | Capacité inférieure aux places occupées (R11) |
 | `registrants_warning` | 409 | Changement de date ou de prix avec des inscrits : confirmer puis renvoyer avec `confirmRegistrantsWarning: true` (R12) |
 | `event_already_published` | 409 | Suppression d'un événement qui a déjà été publié (R15 étape 2) |
+| `event_full` | 409 | Demande de place : plus aucune place (RG-02) |
+| `reservations_closed` | 409 | Demande de place : événement commencé ou terminé (R2) |
+| `already_reserved` | 409 | Le membre a déjà une demande active pour cet événement (RG-03) ; extension `reservationId` |
+| `reservation_state_changed` | 409 | La demande n'est plus dans le statut attendu (annulée, refusée, expirée, traitée par un autre) ; extension `currentStatus` |
+| `cancellation_deadline_passed` | 409 | Annulation d'une réservation confirmée à moins de 24 h du début (RG-05) |
+| `reservation_not_confirmed` | 409 | « Payée » sur une demande encore en attente (« Confirmez d'abord la demande avant de la marquer payée ») ; extension `currentStatus` |
+| `payment_not_applicable` | 409 | « Payée » sur un événement gratuit (« Cet événement est gratuit : aucun paiement à enregistrer ») |
 | `contact_not_configured` | — | **Avertissement** (pas une erreur), dans `warnings` de la réponse 200 de publication |
 
-Liste de référence : `src/Aaas.Domain/Common/ErrorCodes.cs`. Un code existant ne doit jamais être renommé (le front s'appuie dessus).
+Liste de référence : `src/Aaas.Domain/Common/ErrorCodes.cs` ; noms des extensions : `ErrorDetailKeys` (même fichier). Un code existant ne doit jamais être renommé (le front s'appuie dessus).
 
 ## 6. Côté front : règles reprises à titre de confort et affichage
 
@@ -204,6 +294,13 @@ Le serveur reste la seule référence : le front **reprend** certaines règles p
 | Avertissement `contact_not_configured` | bandeau persistant après publication, avec lien « Configurer le numéro de contact » | `admin-event-form.html` |
 | Numéro de contact (US-E8) | case WhatsApp désactivée sans numéro ; retrait après confirmation (`DELETE` avec `{ version }`) ; aperçu `tel:` et `wa.me` | `contact-settings.ts` |
 | Visibilité (RG-14) | brouillon ou identifiant inconnu → « Contenu introuvable » à la même adresse ; identifiant qui n'est pas un GUID → même page, sans appel à l'API ; idem pour la fiche admin `/admin/evenements/:id` | `features/public/event-detail/`, `admin-event-form.ts`, `shared/ids.ts` |
-| Bouton « Demander une place » (US-C2) | affiché pour un **visiteur** si l'événement est réservable, mène à `/connexion?returnUrl=/evenements/{id}` ; masqué pour un membre connecté tant que l'étape 4 n'existe pas (UX-9) | `event-detail.html` |
+| Panneau « Ma réservation » (US-C2, US-D1, US-D3, US-D4 ; **UX-9 levé** le 24/11/2026) | **visiteur** : lien « Demander une place » vers `/connexion?returnUrl=/evenements/{id}` si réservable, sans appel à `/api/me` ; **connecté** : lit « ma demande » (`GET /api/me/events/{id}/reservation`). En attente : échéance à l'heure de Tunis, prix, « Annuler ma demande », carte de contact. Confirmée : date limite d'annulation et bouton, ou « délai dépassé » + carte de contact. Dernière demande terminée : une ligne d'information (motif si refusée) puis le bouton si réservable. Bouton « Demander une place » désactivé pendant l'envoi (« Envoi en cours… ») ; 409 `already_reserved` → **aucun message**, la demande existante est relue (double clic) ; `event_full`, `reservations_closed`, `event_cancelled` → message de l'API et rechargement du détail. Toute action recharge le détail (places restantes) | `features/reservations/reservation-panel/`, `features/public/event-detail/` |
+| Annulation par le membre | dialogue « Annuler cette demande ? » / « Annuler cette réservation ? », « Votre place sera libérée. » (+ rappel du remboursement si payée) ; `cancellation_deadline_passed` → message + carte de contact ; `reservation_state_changed` → message + relecture | `features/reservations/reservation-cancellation.ts` |
+| Mes réservations (US-D2) | `/mes-reservations` (connecté, `authGuard`) : sections « À venir » et « Historique », 20 par page chacune ; statuts vus par le membre (« En attente de confirmation », « Annulée par vous »…) ; « — Terminé » si l'événement est fini ; prix ou « Payée le … » ; événement repassé en brouillon : titre sans lien + « Événement indisponible » ; lien depuis l'en-tête et depuis « Mon compte » | `features/reservations/my-reservations/`, `shared/reservations/reservation-labels.ts` |
+| Carte de contact (US-D4, R8) | numéro lu une fois par session (`ContactStore`), lien « Appeler » (`tel:+216…`), « Écrire sur WhatsApp » (`https://wa.me/216…`) seulement si WhatsApp ; sans numéro : « L'association n'a pas communiqué de numéro pour le moment. » | `shared/ui/contact-card.ts`, `core/contact/contact.store.ts` |
+| Données des réservations | jamais dans `localStorage` ; uniquement en mémoire (signals) | conception (ADR 0015, 0021) |
+| Demandes à traiter (US-E6) | `/admin/demandes` : membre (prénom, nom, liens `tel:` et `wa.me`, `mailto:`), événement (lien vers ses inscrits), « Demandée le », « À traiter avant » ; boutons « Confirmer », « Refuser » ; 20 par page ; « Aucune demande à traiter. » ; sous-menu « Demandes (N) » (« Demandes » seul à 0 ou si le nombre n'a pas pu être lu), rafraîchi à l'entrée dans l'espace admin et après chaque action | `features/admin/reservations/pending-requests/`, `PendingCountStore`, `admin-layout.ts` |
+| Inscrits (US-E4, E5, E7) | `/admin/evenements/:id/inscrits` (déclarée avant `evenements/:id`) ; liens « Inscrits » depuis la liste et la fiche admin ; total, rappel « Ces coordonnées sont réservées à l'organisation de l'événement. », trois sections, colonne « Paiement » si l'événement est payant (« Payée le … par … » / « Non payée ») ; boutons affichés d'après `actions` de l'API ; événement terminé : message et plus de bouton « Annuler la réservation » ; identifiant non GUID → « Contenu introuvable » sans appel | `features/admin/reservations/event-registrants/` |
+| Actions admin sur une réservation | boutons de la ligne désactivés pendant l'appel (`busyIds`, un double clic = un appel) ; refus : dialogue « Refuser cette demande ? » (motif facultatif, compteur « n / 500 », saisie bloquée à 500) ; annulation : confirmation (rappel de prévenir la personne, et du remboursement si payée) ; succès : message court ; erreur (409 `reservation_state_changed`, `event_ended`, `payment_not_applicable`…) : message de l'API en bandeau, puis **relecture** de la liste (statut actuel) et du compteur | `admin-reservation-actions.ts`, `refuse-dialog.ts` |
 | Accès admin | menu « Administration » si le jeton porte le rôle `Admin` ; un membre sur `/admin…` voit « Accès réservé » (le code admin n'est pas téléchargé, `canMatch`) | `layout/header.html`, `core/auth/auth.guards.ts` |
 | Quitter un formulaire modifié (UX-8) | confirmation « Quitter sans enregistrer ? » (navigation interne) et alerte du navigateur (fermeture de l'onglet) | `shared/forms/unsaved-changes.guard.ts`, `host` des formulaires admin |

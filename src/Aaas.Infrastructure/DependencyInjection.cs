@@ -3,6 +3,7 @@ using Aaas.Application.Accounts;
 using Aaas.Application.Options;
 using Aaas.Infrastructure.Identity;
 using Aaas.Infrastructure.Initialization;
+using Aaas.Infrastructure.Jobs;
 using Aaas.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -97,6 +98,12 @@ public static class DependencyInjection
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<DatabaseInitializer>();
 
+        // Tâche d'expiration (ADR 0020). Toujours enregistrée : Reservations:ExpirationJob:Enabled est lu dans
+        // StartAsync via IOptions (validé au démarrage), pas ici, où la configuration des tests n'est pas encore fusionnée.
+        // Les services hébergés démarrent dans app.RunAsync, donc après l'initialisation (migrations) de Program.cs.
+        services.AddSingleton<ApiActivity>();
+        services.AddHostedService<ExpirePendingReservationsJob>();
+
         // /health/ready vérifie la base ; /health (liveness) ne la touche pas, voir Program.cs.
         services.AddHealthChecks().AddDbContextCheck<AppDbContext>(tags: [ReadyHealthCheckTag]);
 
@@ -117,6 +124,12 @@ public static class DependencyInjection
             .BindConfiguration(PrivacyPolicyOptions.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+
+        // Délais des réservations (48 h, 24 h) : absents de la configuration → valeurs par défaut de la classe.
+        services.AddOptions<ReservationOptions>()
+            .BindConfiguration(ReservationOptions.SectionName)
+            .ValidateOnStart();
+        services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<ReservationOptions>, ReservationOptionsValidator>();
 
         services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.SectionName);
         services.AddOptions<BootstrapOptions>().BindConfiguration(BootstrapOptions.SectionName);

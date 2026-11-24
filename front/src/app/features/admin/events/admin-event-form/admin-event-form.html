@@ -26,6 +26,7 @@
           <span class="muted">
             {{ e.pendingCount }} en attente, {{ e.confirmedCount }} confirmées, {{ e.remainingSeats }} places libres
           </span>
+          <a [routerLink]="['/admin/evenements', e.id, 'inscrits']">Inscrits</a>
         </p>
         @if (e.publishedAt) {
           <p class="muted small">Publié le {{ e.publishedAt | date: detailFormat }}</p>

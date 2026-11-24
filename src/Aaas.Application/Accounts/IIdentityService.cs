@@ -19,7 +19,16 @@ public interface IIdentityService
 
     /// <summary>Faux si le compte n'existe plus ou si son security stamp a changé (révocation des jetons, ADR 0002).</summary>
     Task<bool> IsSecurityStampValidAsync(Guid userId, string securityStamp, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Coordonnées de plusieurs comptes en UNE requête (ADR 0021 § 3, pas de N+1). Un identifiant sans compte
+    /// (supprimé) est absent du dictionnaire : l'appelant affiche « Compte supprimé ». Réservé aux vues admin.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, MemberContact>> GetContactsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 }
+
+/// <summary>Coordonnées d'un membre vues par un administrateur (RG-15) ; jamais journalisées.</summary>
+public sealed record MemberContact(Guid Id, string FirstName, string LastName, string Email, string PhoneNumber);
 
 /// <summary>Compte tel que vu par Application. <see cref="SecurityStamp"/> sert uniquement à émettre le jeton.</summary>
 public sealed record UserAccount(

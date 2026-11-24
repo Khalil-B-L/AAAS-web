@@ -1,10 +1,13 @@
 using Aaas.Application.Abstractions;
 using Aaas.Application.Common;
 using Aaas.Application.Common.Errors;
+using Aaas.Application.Options;
 using Aaas.Application.Settings;
 using Aaas.Domain.Common;
 using Aaas.Domain.Events;
+using Aaas.Domain.Reservations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Aaas.Application.Events;
 
@@ -14,6 +17,7 @@ public sealed class AdminEventService(
     IEventLock eventLock,
     EventOccupancyReader occupancyReader,
     SettingsService settings,
+    IOptions<ReservationOptions> reservationOptions,
     TimeProvider time)
 {
     public const string NotFoundMessage = "Événement introuvable.";
@@ -81,22 +85,50 @@ public sealed class AdminEventService(
     public async Task<AdminEventDto> UpdateAsync(Guid id, UpdateEventRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var now = time.GetUtcNow();
         var details = ToDetails(request);
         var expectedVersion = RowVersions.Decode(request.Version);
 
-        var (updated, occupancy) = await RunLockedAsync(id, async (ev, ct) =>
+        async Task<(Event Event, EventOccupancy Occupancy, DateTimeOffset Now)> Work(Event ev, CancellationToken ct)
         {
+            // Après le verrou : lu avant, « now » pourrait précéder de quelques secondes l'échéance d'une demande échue
+            // pendant l'attente ; RescheduleDeadlinesAsync la croirait vivante (ranimée) ou poserait une échéance
+            // antérieure à la demande (CK_Reservations_Deadline). Renvoyé pour que le DTO utilise la même heure.
+            var now = time.GetUtcNow();
             ConcurrencyGuard.EnsureSameVersion(ev.RowVersion, expectedVersion);
             ev.EnsureCanBeEdited(now);
             FieldErrors.ThrowIfAny(EventRules.Validate(details, previousStartsAt: ev.StartsAt, now));
             var current = await occupancyReader.GetAsync(id, now, ct);
+            var previousStartsAt = ev.StartsAt;
             ev.Update(details, now, current, request.ConfirmRegistrantsWarning);
-            return (ev, current);
-        }, cancellationToken);
+            if (ev.StartsAt != previousStartsAt)
+            {
+                await RescheduleDeadlinesAsync(ev, now, ct);
+            }
+
+            return (ev, current, now);
+        }
+
+        (Event Event, EventOccupancy Occupancy, DateTimeOffset Now) result;
+        try
+        {
+            result = await eventLock.ExecuteWithLockedEventAsync(id, Work, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex) when (ex.Entries.Count > 0 && ex.Entries.All(e => e.Entity is Reservation))
+        {
+            // Seules des demandes ont bougé entre la lecture des demandes et l'enregistrement, par un écrivain sans
+            // verrou d'événement : un membre qui annule, ou la tâche d'expiration (ExpireDueAsync, tous événements,
+            // ADR 0020) qui écrit Expirée. La fiche de l'admin n'est pas périmée, concurrent_update serait faux. La transaction
+            // est annulée ; on rejoue UNE fois sur des données relues (un second conflit → concurrent_update).
+            db.ChangeTracker.Clear();
+            result = await RunLockedAsync(id, Work, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw ConcurrencyGuard.Conflict();
+        }
 
         // Construit après l'enregistrement : la nouvelle version (rowversion) a été relue par EF.
-        return ToAdminDto(updated, occupancy, now);
+        return ToAdminDto(result.Event, result.Occupancy, result.Now);
     }
 
     /// <summary>
@@ -144,6 +176,23 @@ public sealed class AdminEventService(
         await db.SaveChangesOrConflictAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// ADR 0018 § 5 : le début a changé → les demandes en attente NON échues reprennent l'échéance
+    /// min(demande + 48 h, nouveau début). Sous le verrou de l'événement : aucune demande ne peut s'insérer entre-temps,
+    /// mais un membre peut en annuler une (sans verrou) : UpdateAsync rejoue alors une fois.
+    /// Les lignes suivies sont enregistrées par IEventLock avec l'événement (même transaction).
+    /// </summary>
+    private async Task RescheduleDeadlinesAsync(Event ev, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var pending = await db.Reservations
+            .Where(r => r.EventId == ev.Id && r.Status == ReservationStatus.Pending && r.ExpiresAt > now)
+            .ToListAsync(cancellationToken);
+        foreach (var reservation in pending)
+        {
+            reservation.RescheduleDeadline(ev.StartsAt, reservationOptions.Value.PendingLifetime, now);
+        }
+    }
+
     private async Task<TResult> RunLockedAsync<TResult>(
         Guid id, Func<Event, CancellationToken, Task<TResult>> work, CancellationToken cancellationToken)
     {
@@ -153,7 +202,9 @@ public sealed class AdminEventService(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Filet : sous verrou, aucune écriture ne peut s'intercaler entre la lecture et l'enregistrement.
+            // Le verrou protège la ligne de l'événement, pas celles des réservations : une annulation de membre
+            // (sans verrou, ADR 0019 § 1) peut modifier une demande lue dans le bloc. Ici, aucun rejeu : 409.
+            // UpdateAsync, qui touche des demandes (échéances), rejoue une fois avant d'arriver là.
             throw ConcurrencyGuard.Conflict();
         }
     }

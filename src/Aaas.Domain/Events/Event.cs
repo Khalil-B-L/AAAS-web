@@ -1,4 +1,5 @@
 using Aaas.Domain.Common;
+using Aaas.Domain.Reservations;
 
 namespace Aaas.Domain.Events;
 
@@ -99,6 +100,34 @@ public sealed class Event
             && (details.StartsAt != StartsAt
                 || details.EndsAt != EndsAt
                 || EventRules.NormalizePrice(details.Price) != Price);
+    }
+
+    /// <summary>
+    /// R2 sans la capacité : annulé (event_cancelled), puis commencé ou terminé (reservations_closed).
+    /// Brouillon : Application répond 404 avant d'arriver ici (on ne révèle pas un brouillon) ; filet, reservations_closed.
+    /// Séparé de <see cref="EnsureCanAcceptRequest"/> parce que « déjà inscrit » se contrôle entre les deux (ADR 0018 § 3).
+    /// </summary>
+    public void EnsureOpenForRequests(DateTimeOffset now)
+    {
+        if (Status == EventStatus.Cancelled)
+        {
+            throw new BusinessRuleException(ErrorCodes.EventCancelled, ReservationRules.EventCancelledMessage);
+        }
+
+        if (Status != EventStatus.Published || HasStarted(now))
+        {
+            throw new BusinessRuleException(ErrorCodes.ReservationsClosed, ReservationRules.ReservationsClosedMessage);
+        }
+    }
+
+    /// <summary>R2 complet : <see cref="EnsureOpenForRequests"/>, puis RG-02 (event_full). Même règle que <see cref="IsBookable"/>.</summary>
+    public void EnsureCanAcceptRequest(DateTimeOffset now, EventOccupancy occupancy)
+    {
+        EnsureOpenForRequests(now);
+        if (IsFull(occupancy))
+        {
+            throw new BusinessRuleException(ErrorCodes.EventFull, ReservationRules.EventFullMessage);
+        }
     }
 
     /// <summary>R28 : annulé ou terminé → plus modifiable. Commencé mais pas terminé → modifiable.</summary>

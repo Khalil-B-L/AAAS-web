@@ -113,6 +113,22 @@ internal sealed class IdentityService(
     public Task<bool> IsSecurityStampValidAsync(Guid userId, string securityStamp, CancellationToken cancellationToken) =>
         db.Users.AnyAsync(u => u.Id == userId && u.SecurityStamp == securityStamp, cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, MemberContact>> GetContactsAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(userIds);
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, MemberContact>();
+        }
+
+        var ids = userIds.Distinct().ToList();
+        return await db.Users.AsNoTracking()
+            .Where(u => ids.Contains(u.Id))
+            .Select(u => new MemberContact(u.Id, u.FirstName, u.LastName, u.Email ?? string.Empty, u.PhoneNumber ?? string.Empty))
+            .ToDictionaryAsync(c => c.Id, cancellationToken);
+    }
+
     private static UserAccount ToAccount(AppUser user, IReadOnlyList<string> roles) => new(
         user.Id,
         user.FirstName,

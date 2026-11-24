@@ -115,6 +115,9 @@ describe('AdminEventList (US-E2)', () => {
     expect(content).toContain('Atelier couture');
     expect(content).toContain('27 / 30 libres');
     expect(content).toContain('1 en attente, 2 confirmées');
+    // Nom accessible avec le titre : sinon un lecteur d'écran entend « Inscrits » répété à chaque ligne.
+    const registrantsLink = (harness.routeNativeElement as HTMLElement).querySelector('a[href="/admin/evenements/1/inscrits"]');
+    expect(registrantsLink?.getAttribute('aria-label')).toBe('Inscrits — Atelier couture');
 
     api.list.mockReturnValue(of(result([])));
     await open('/admin/evenements?status=Cancelled');

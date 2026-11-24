@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { buttonByText, problem, query, text } from '../../../../testing/dom';
 import { AccountApi } from '../../../core/api/account.api';
@@ -27,7 +28,9 @@ describe('MyAccount (US-F3)', () => {
 
   beforeEach(() => {
     api = { me: vi.fn() };
-    TestBed.configureTestingModule({ providers: [...FORMATTING_PROVIDERS, { provide: AccountApi, useValue: api }] });
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), ...FORMATTING_PROVIDERS, { provide: AccountApi, useValue: api }],
+    });
   });
 
   it('affiche un indicateur pendant le chargement', async () => {

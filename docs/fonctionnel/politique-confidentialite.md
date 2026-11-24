@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version du texte** | 1.0-provisoire — 23/11/2026 |
+| **Version du texte** | 1.1-provisoire — 24/11/2026 |
 | **Statut** | Provisoire : à relire et à compléter par le porteur et l'association avant la mise en ligne |
 
 > **À compléter par le porteur / l'association** (champs entre crochets) :
@@ -19,7 +19,7 @@
 
 # Politique de confidentialité
 
-*Version 1.0 — en vigueur depuis le [DATE DE MISE EN LIGNE]*
+*Version 1.1 — en vigueur depuis le [DATE DE MISE EN LIGNE]*
 
 ## 1. Qui est responsable de vos données ?
 
@@ -34,12 +34,12 @@ Uniquement ce qui est nécessaire au fonctionnement du site :
 | Donnée | Pourquoi |
 |---|---|
 | Prénom et nom | Vous identifier dans vos réservations et sur les listes d'inscrits tenues par les administrateurs |
-| Adresse e-mail | Vous connecter à votre compte |
-| Numéro de téléphone (« +216 » et 8 chiffres) | Permettre à un administrateur de vous joindre pour valider votre demande de place et, le cas échéant, régler le prix en main propre |
+| Adresse e-mail | Vous connecter à votre compte ; permettre aux administrateurs de vous joindre si besoin |
+| Numéro de téléphone (« +216 » et 8 chiffres) | Permettre à un administrateur de vous joindre pour valider votre demande de place, vous prévenir d'un changement ou d'une annulation et, le cas échéant, régler le prix en main propre |
 | Mot de passe | Protéger votre compte. Il n'est **jamais conservé en clair** : seule une empreinte irréversible est enregistrée |
 | Date de création du compte et date de dernière connexion | Vous les montrer dans « Mon compte » et repérer les comptes inactifs à supprimer |
 | Date de votre accord et version de cette politique acceptée | Prouver que vous avez donné votre consentement |
-| Vos demandes de réservation (événement, statut, mention « payé » le cas échéant) | Gérer les inscriptions aux événements |
+| Vos demandes de réservation (événement, statut, dates, motif de refus éventuel, mention « payé » avec sa date et le nom de l'administrateur qui l'a enregistrée) | Gérer les inscriptions aux événements |
 
 Nous ne collectons **aucune donnée de paiement** : il n'y a pas de paiement en ligne. Nous n'utilisons **aucun traceur publicitaire** et ne vendons ni ne cédons vos données.
 
@@ -47,7 +47,7 @@ Nous ne collectons **aucune donnée de paiement** : il n'y a pas de paiement en 
 
 - Créer et gérer votre compte ;
 - traiter vos demandes de réservation (demande, confirmation, refus, annulation, suivi du paiement remis en main propre) ;
-- permettre aux administrateurs de vous contacter au sujet de ces demandes ;
+- permettre aux administrateurs de vous contacter au sujet de ces demandes, de préparer l'accueil des participants (liste des inscrits) et de prévenir les inscrits en cas de changement ou d'annulation d'un événement ;
 - assurer la sécurité du site.
 
 Vos données ne sont pas utilisées à d'autres fins sans votre accord.
@@ -55,7 +55,7 @@ Vos données ne sont pas utilisées à d'autres fins sans votre accord.
 ## 4. Qui peut voir vos données ?
 
 - **Vous** : dans « Mon compte » et « Mes réservations ».
-- **Les administrateurs de l'association** : vos nom, prénom, e-mail et téléphone, pour traiter vos réservations.
+- **Les administrateurs de l'association** : dès que vous faites une demande de place, ils voient vos **nom, prénom, numéro de téléphone et adresse e-mail**, ainsi que l'événement concerné et l'état de votre demande. Ils les voient dans la liste des demandes à traiter et dans la liste des inscrits de chaque événement. **Pourquoi ?** Parce que la réservation se fait en deux temps : l'administrateur doit pouvoir vous joindre pour valider votre demande, régler le prix en main propre, préparer l'accueil et vous prévenir si l'événement change ou est annulé (l'application n'envoie ni e-mail ni SMS automatique). Les administrateurs sont des bénévoles désignés par l'association ; ils n'utilisent ces coordonnées que pour l'organisation des événements. Ils ne voient **jamais votre mot de passe**.
 - **Les prestataires techniques** qui hébergent le site (hébergement et base de données Azure, région France Central), uniquement pour le faire fonctionner. Vos données sont donc **hébergées hors de Tunisie**, en France.
 - Les autres membres et les visiteurs **ne voient jamais** vos données.
 
@@ -63,7 +63,7 @@ Vos données ne sont pas utilisées à d'autres fins sans votre accord.
 
 - Tant que votre compte existe.
 - Un compte **inactif depuis 3 ans** (sans connexion) est supprimé.
-- Si vous **supprimez votre compte** : la suppression est immédiate et définitive ; vos réservations à venir sont annulées (les places sont libérées) et les autres réservations sont **rendues anonymes** (elles ne peuvent plus être reliées à vous). Les statistiques d'un événement restent ainsi cohérentes.
+- Si vous **supprimez votre compte** : la suppression est immédiate et définitive ; vos réservations à venir sont annulées (les places sont libérées) et les autres réservations sont **rendues anonymes** (elles ne peuvent plus être reliées à vous : les administrateurs y voient alors « Compte supprimé »). Les statistiques d'un événement restent ainsi cohérentes.
 
 ## 6. Sauvegardes
 
@@ -106,3 +106,6 @@ Si ce texte change, sa version change : il vous sera demandé de l'accepter de n
 - Le point 8 (mineurs) respecte la décision du porteur (aucun contrôle) ; c'est un simple conseil, non une obligation. À supprimer si vous préférez ne rien dire.
 - Le point 10 suppose qu'aucune redemande de consentement n'existe au MVP : à valider.
 - Le droit d'opposition et le délai de réponse sont formulés de façon générale ; faire vérifier les formulations exactes par une personne connaissant la loi 2004-63.
+- **Version 1.1 (24/11/2026)** : le point 4 précise que les administrateurs voient nom, prénom, téléphone et e-mail des inscrits, et pourquoi (cahier RG-15, plan des réservations QF-9). La version 1.0 disait déjà que les administrateurs voient ces données ; ce n'est donc **pas un nouveau traitement**, seulement une explication plus claire (listes, raison, « Compte supprimé »). La version 1.1 n'a jamais été mise en ligne : aucun membre n'a à ré-accepter quoi que ce soit.
+- La phrase « les administrateurs sont des bénévoles désignés par l'association ; ils n'utilisent ces coordonnées que pour l'organisation des événements » est un **engagement** de l'association : à valider avec elle (idéalement, que les administrateurs en soient informés).
+- Historique des versions : 1.0-provisoire (23/11/2026) ; 1.1-provisoire (24/11/2026).
