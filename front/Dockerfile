@@ -22,7 +22,7 @@ RUN npx ng build --configuration production
 # ---------- Étape 2 : image finale ----------
 # nginx « unprivileged » : processus non-root (utilisateur nginx, UID 101), à l'écoute sur 8080
 # (un port < 1024 exigerait root). Même principe que « USER $APP_UID » dans l'image de l'API.
-FROM nginxinc/nginx-unprivileged:1.30.6-alpine3.24 AS final
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine3.24 AS final
 
 # Configuration : repli SPA, relais /api vers le conteneur api, cache, gzip, en-têtes de sécurité, /healthz.
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
