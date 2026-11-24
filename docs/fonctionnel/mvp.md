@@ -1,7 +1,7 @@
 # Cadrage fonctionnel du MVP — AAAS
 
 > Rédigé par l'expert fonctionnel. Document de référence pour l'agent `architecte` (choix techniques) et l'agent `testeur` (les scénarios Gherkin servent de base aux tests).
-> Statut : **proposition, version 5**, mise à jour avec les décisions du porteur de projet (cahier des charges v1.4). Les valeurs par défaut marquées *(défaut)* sont à confirmer avec l'association (voir § 5).
+> Statut : **proposition, version 6**, mise à jour avec les décisions du porteur de projet (cahier des charges v1.5). Les valeurs par défaut marquées *(défaut)* sont à confirmer avec l'association (voir § 5).
 
 ### Décisions du porteur de projet (version 2)
 - L'association est en **Tunisie**. L'application est **en français uniquement**.
@@ -38,6 +38,17 @@ Le porteur **accepte toutes les valeurs par défaut** du plan `technique/plan-re
 - **Politique de confidentialité** : elle mentionne que les administrateurs voient les coordonnées des inscrits (QF-9, R32) ; texte en version 1.1-provisoire.
 - **Décisions P-R1 à P-R8** (plan) ayant un effet fonctionnel : délais 48 h et 24 h en configuration, non modifiables par l'admin depuis l'interface (P-R4) ; un double clic sur « Demander une place » ne crée qu'une demande et ne montre pas d'erreur (P-R5, US-D1) ; l'application **n'enregistre pas** quel admin a confirmé ou refusé une demande, seulement celui qui a marqué « Payée » (P-R6, US-E6, US-E7) ; la liste des inscrits n'est pas paginée (P-R7, US-E4). P-R1 à P-R3 et P-R8 sont techniques (validation des ADR, tâche d'expiration en arrière-plan toutes les 5 minutes, ordre des tâches) : voir l'architecte.
 
+### Décisions du porteur de projet (version 6, cahier des charges v1.5 — tranche « Actualités »)
+Le porteur **accepte toutes les valeurs par défaut** du plan `technique/plan-actualites.md` : questions **QN-1 à QN-9** et décisions **P-N1 à P-N7** (ADR 0022 et 0023). Voir R18, US-B1, US-B2, US-E1 et `libelles-ecrans.md` (version 1.3).
+- **Texte brut**, 8 000 caractères au plus (titre : 200) ; **pas d'image**, pas de mise en forme, **pas de lien cliquable** ; une balise saisie (par exemple `<script>`) s'affiche comme du texte (QN-1, QN-5).
+- Une actualité **republiée garde sa date d'origine** ; **pas de « Mise à jour le »** ; **pas d'auteur affiché** (QN-2, QN-7, QN-4).
+- **Extrait automatique** de 200 caractères dans la liste (QN-3).
+- **Suppression directe** d'une actualité publiée, après une confirmation qui le rappelle (QN-6).
+- **Liste admin** triée par dernière modification, avec filtre par statut ; **aperçu** dans le formulaire (QN-9, P-N6).
+- **Page d'accueil** « / » = actualités ; lien « Actualités » en premier dans les menus (QN-8).
+- **Pas d'épinglage** (actualité mise en tête) ni de publication programmée.
+- P-N1 à P-N5 et P-N7 sont techniques (validation des ADR, nom de la classe `NewsArticle`, pagination par numéros de page, publication / dépublication / suppression sans numéro de version, remaniement de la pagination, **ordre : actualités après l'annulation d'un événement**, comme le prévoit le cahier § 8) : voir l'architecte. P-N4 a un effet visible : seul l'**enregistrement d'une modification** détecte qu'un autre admin est passé avant (conflit de modification) ; publier, dépublier et supprimer ne comparent pas de version, mais refusent un état incohérent (déjà publiée, pas publiée, déjà supprimée).
+
 ### Correspondance du vocabulaire (cahier des charges / ce document)
 
 | Cahier des charges | Ce document | Dans le code (indication de l'architecte) |
@@ -47,7 +58,7 @@ Le porteur **accepte toutes les valeurs par défaut** du plan `technique/plan-re
 | Administrateur | Administrateur | rôle `Admin` |
 | RG-xx (règles obligatoires, § 5.2 du cahier) | R-xx (règles détaillées, § 4 ci-dessous) | — |
 
-Correspondance des règles : RG-01 = R2, RG-02 = R5 et R7, RG-03 = R4, R31 et R33, RG-04 = R6 et R30, RG-05 = R9, RG-06 = R11, RG-07 = R14 et R15, RG-08 = R12 et R13, RG-09 = R22, RG-10 = R8, RG-11 = R20, RG-12 = R28 (et R30 pour le recalcul), RG-13 = R11, R12 et R29, RG-14 = R19, RG-15 = R32. En cas de contradiction, le cahier des charges fait foi.
+Correspondance des règles : RG-01 = R2, RG-02 = R5 et R7, RG-03 = R4, R31 et R33, RG-04 = R6 et R30, RG-05 = R9, RG-06 = R11, RG-07 = R14 et R15, RG-08 = R12 et R13, RG-09 = R22, RG-10 = R8, RG-11 = R20, RG-12 = R28 (et R30 pour le recalcul), RG-13 = R11, R12 et R29, RG-14 = R19, RG-15 = R32, RG-16 = R18 (et R26 pour la date). En cas de contradiction, le cahier des charges fait foi.
 
 ---
 
@@ -214,7 +225,9 @@ Fonctionnalité: Déconnexion
 
 ### Épique B — Actualités
 
-#### US-B1 — Consulter la liste des actualités
+Règles : R18 (et RG-16 du cahier des charges). Les actualités sont la **page d'accueil** du site. La date de publication s'affiche **sans l'heure**, au jour de Tunis. Le texte d'une actualité est toujours affiché **comme du texte** (aucune balise n'est interprétée).
+
+#### US-B1 — Consulter la liste des actualités *(modifiée v6 : extrait, date, ordre, accueil)*
 > En tant que **visiteur**, je veux **voir les actualités publiées, les plus récentes en premier** afin de **suivre la vie de l'association**.
 
 ```gherkin
@@ -233,13 +246,86 @@ Fonctionnalité: Liste des actualités
     Alors je vois les 10 plus récentes
     Et je peux passer à la page suivante
 
+  Scénario: Dernière page
+    Étant donné que 25 actualités sont publiées
+    Quand j'ouvre la page 3 des actualités
+    Alors je vois les 5 plus anciennes
+    Et la page indique "Page 3 sur 3"
+
   Scénario: Aucune actualité
     Étant donné qu'aucune actualité n'est publiée
     Quand j'ouvre la page des actualités
     Alors un message indique "Aucune actualité pour le moment"
+
+  Scénario: Deux actualités publiées au même moment
+    Étant donné que 12 actualités ont exactement la même date de publication
+    Quand je consulte la page 1 puis la page 2, et que je recommence
+    Alors l'ordre est toujours le même
+    Et chaque actualité apparaît une seule fois sur l'ensemble des deux pages
+
+  Scénario: Extrait d'un texte court
+    Étant donné une actualité dont le texte fait 150 caractères
+    Quand j'ouvre la page des actualités
+    Alors l'extrait est le texte entier, sans "…"
+
+  Scénario: Extrait d'un texte long
+    Étant donné une actualité dont le texte dépasse 200 caractères
+    Quand j'ouvre la page des actualités
+    Alors l'extrait fait 200 caractères au plus
+    Et il est coupé à la fin d'un mot
+    Et il se termine par "…"
+
+  Scénario: Extrait d'un texte de exactement 200 caractères
+    Étant donné une actualité dont le texte fait exactement 200 caractères
+    Quand j'ouvre la page des actualités
+    Alors l'extrait est le texte entier, sans "…"
+
+  Scénario: Extrait d'un texte sans espace
+    Étant donné une actualité dont le texte est un seul mot de 300 caractères
+    Quand j'ouvre la page des actualités
+    Alors l'extrait est coupé net à 200 caractères et se termine par "…"
+
+  Scénario: Extrait d'un texte en plusieurs paragraphes
+    Étant donné une actualité dont le texte contient des sauts de ligne et des lignes vides
+    Quand j'ouvre la page des actualités
+    Alors l'extrait tient sur un seul paragraphe, les sauts de ligne étant remplacés par une espace
+
+  Scénario: Contenu contenant des balises
+    Étant donné une actualité dont le titre ou le texte contient "<b>gras</b>" ou "<script>alert(1)</script>"
+    Quand j'ouvre la page des actualités
+    Alors ces caractères s'affichent tels quels, comme du texte
+    Et aucun code n'est exécuté
+
+  Scénario: Date affichée à l'heure de Tunis
+    Étant donné une actualité publiée le 5 décembre 2026 à 23 h 30 UTC (soit le 6 décembre à 0 h 30 à Tunis)
+    Quand j'ouvre la page des actualités
+    Alors sa date affichée est "Publiée le 6 décembre 2026"
+    Et aucune heure n'est affichée
+
+  Scénario: Une actualité dépubliée ou supprimée disparaît aussitôt
+    Étant donné une actualité publiée visible dans la liste
+    Quand un administrateur la dépublie ou la supprime
+    Alors elle n'apparaît plus dans la liste dès l'actualisation de la page
+
+  Scénario: Une actualité republiée garde sa place
+    Étant donné une actualité publiée le 1er novembre, dépubliée, puis republiée le 20 novembre
+    Quand j'ouvre la page des actualités
+    Alors elle est classée selon sa date d'origine, le 1er novembre
+    Et elle n'est pas remontée en tête de liste
+
+  Scénario: Page d'accueil
+    Quand j'ouvre l'adresse principale du site
+    Alors la page des actualités s'affiche
+    Et le lien "Actualités" est le premier du menu
+    Et un clic sur le logo ou le nom du site me ramène à cette page
+
+  Scénario: Accessible sans compte, même avec une session expirée
+    Étant donné que je suis visiteur, ou que ma session a expiré
+    Quand j'ouvre la page des actualités
+    Alors les actualités s'affichent sans me demander de me connecter
 ```
 
-#### US-B2 — Lire une actualité
+#### US-B2 — Lire une actualité *(modifiée v6 : contenu, date, adresse mal formée)*
 > En tant que **visiteur**, je veux **lire une actualité en entier** afin d'**avoir toute l'information**.
 
 ```gherkin
@@ -253,6 +339,72 @@ Fonctionnalité: Détail d'une actualité
     Étant donné qu'une actualité a été dépubliée
     Quand j'ouvre son adresse directement
     Alors une page "Contenu introuvable" s'affiche
+
+  Scénario: Actualité en brouillon
+    Étant donné une actualité en brouillon qui n'a jamais été publiée
+    Quand j'ouvre son adresse directement
+    Alors une page "Contenu introuvable" s'affiche
+
+  Scénario: Adresse mal formée
+    Quand j'ouvre l'adresse d'une actualité dont l'identifiant n'a pas la forme attendue (par exemple "/actualites/abc")
+    Alors une page "Contenu introuvable" s'affiche
+    Et aucune erreur technique ne m'est montrée
+
+  Scénario: Le même message pour tous les cas d'absence
+    Quand j'ouvre l'adresse d'une actualité en brouillon, dépubliée, supprimée, inexistante ou mal formée
+    Alors la page "Contenu introuvable" est identique dans tous les cas
+    Et rien ne me permet de savoir si l'actualité existe ou a existé
+    Et un lien "Retour à l'accueil" me ramène à la page des actualités
+
+  Scénario: Un administrateur n'a pas de passe-droit sur l'adresse publique
+    Étant donné que je suis connecté en tant qu'administrateur
+    Et une actualité en brouillon
+    Quand j'ouvre son adresse publique
+    Alors une page "Contenu introuvable" s'affiche
+    Et je dois utiliser l'aperçu du formulaire d'administration pour la voir
+
+  Scénario: Contenu contenant du code
+    Étant donné une actualité dont le texte contient "<script>alert(1)</script><img src=x onerror=alert(1)>"
+    Quand je l'ouvre
+    Alors ce texte s'affiche tel quel, balises visibles
+    Et aucun code n'est exécuté et aucune image n'est chargée
+
+  Scénario: Paragraphes
+    Étant donné une actualité dont le texte contient deux blocs séparés par une ligne vide
+    Quand je l'ouvre
+    Alors le texte est présenté en deux paragraphes
+
+  Scénario: Ce qui n'est pas affiché
+    Quand j'ouvre une actualité publiée
+    Alors aucun auteur n'est affiché
+    Et aucune mention "Mise à jour le" n'est affichée
+    Et aucune image n'est affichée
+    Et une adresse web écrite dans le texte n'est pas cliquable
+
+  Scénario: Modification d'une actualité déjà publiée
+    Étant donné qu'un administrateur modifie le texte d'une actualité publiée
+    Quand j'ouvre cette actualité après l'enregistrement
+    Alors je vois le nouveau texte
+    Et la date de publication affichée est inchangée
+
+  Scénario: Actualité republiée
+    Étant donné une actualité publiée le 1er novembre, dépubliée, puis republiée le 20 novembre
+    Quand je l'ouvre
+    Alors sa date affichée est "Publiée le 1er novembre 2026"
+
+  Scénario: Date affichée à l'heure de Tunis
+    Étant donné une actualité publiée le 5 décembre 2026 à 23 h 30 UTC
+    Quand je l'ouvre
+    Alors sa date affichée est "Publiée le 6 décembre 2026", sans heure
+
+  Scénario: Texte de la taille maximale
+    Étant donné une actualité dont le texte fait 8 000 caractères
+    Quand je l'ouvre
+    Alors le texte complet est affiché, sans coupure
+
+  Scénario: Retour à la liste
+    Quand je lis une actualité
+    Alors un lien "Retour aux actualités" me ramène à la liste
 ```
 
 ### Épique C — Événements
@@ -677,7 +829,7 @@ Toutes les actions de cette épique sont **réservées aux administrateurs**. Sc
     Et aucune donnée n'est modifiée
 ```
 
-#### US-E1 — Gérer les actualités
+#### US-E1 — Gérer les actualités *(modifiée v6 : limites, aperçu, date conservée, suppression d'une publiée, conflits)*
 > En tant qu'**administrateur**, je veux **créer, modifier, publier, dépublier et supprimer une actualité** afin de **tenir le public informé**.
 
 ```gherkin
@@ -690,6 +842,7 @@ Fonctionnalité: Gestion des actualités
     Quand je crée une actualité avec un titre et un texte
     Alors elle est enregistrée en "Brouillon"
     Et elle n'est pas visible des visiteurs
+    Et je reste sur sa fiche, prête à être modifiée ou publiée
 
   Scénario: Publication
     Étant donné une actualité en brouillon
@@ -702,17 +855,160 @@ Fonctionnalité: Gestion des actualités
     Alors la nouvelle version est visible immédiatement
     Et sa date de publication d'origine est conservée
 
+  Scénario: Modification d'un brouillon
+    Étant donné une actualité en brouillon
+    Quand je modifie son titre et son texte
+    Alors les modifications sont enregistrées
+    Et elle reste en "Brouillon", sans date de publication
+
   Scénario: Dépublication
     Quand je dépublie une actualité
     Alors elle repasse en "Brouillon" et n'est plus visible des visiteurs
+
+  Scénario: Republication
+    Étant donné une actualité publiée le 1er novembre puis dépubliée
+    Quand je la publie de nouveau le 20 novembre
+    Alors elle redevient visible des visiteurs
+    Et sa date de publication reste le 1er novembre
+    Et elle n'est pas remontée en tête de la liste publique
 
   Scénario: Suppression
     Quand je supprime une actualité après confirmation
     Alors elle disparaît définitivement
 
+  Scénario: Suppression d'un brouillon
+    Étant donné une actualité en brouillon
+    Quand je la supprime après confirmation
+    Alors elle disparaît définitivement
+
+  Scénario: Suppression directe d'une actualité publiée
+    Étant donné une actualité publiée
+    Quand je clique sur "Supprimer"
+    Alors une confirmation me rappelle qu'elle est définitive et qu'elle n'est plus visible du public dès maintenant
+    Et après confirmation, elle disparaît de la liste publique et de la liste d'administration, sans avoir à la dépublier d'abord
+    Et son adresse publique affiche "Contenu introuvable"
+
+  Scénario: Suppression sans confirmation
+    Quand je clique sur "Supprimer" puis sur "Annuler" dans la confirmation
+    Alors l'actualité n'est pas supprimée
+
+  Scénario: Suppression d'une actualité déjà supprimée par un autre administrateur
+    Étant donné une actualité que l'administrateur Y vient de supprimer, alors que ma page est restée ouverte
+    Quand je la supprime à mon tour
+    Alors un message m'indique "Cette actualité a déjà été supprimée."
+    Et je suis ramené à la liste
+
   Scénario: Champs obligatoires
     Quand j'enregistre une actualité sans titre ou sans texte
     Alors elle n'est pas enregistrée et le champ manquant est signalé
+
+  Scénario: Texte ne contenant que des espaces
+    Quand j'enregistre une actualité dont le texte ne contient que des espaces ou des sauts de ligne
+    Alors elle n'est pas enregistrée et le texte est signalé comme obligatoire
+
+  Plan du Scénario: Limites de saisie
+    Quand j'enregistre une actualité avec <champ> égal à <valeur>
+    Alors la saisie est <résultat>
+
+    Exemples:
+      | champ | valeur                                            | résultat                              |
+      | titre | 200 caractères                                    | acceptée                              |
+      | titre | 201 caractères                                    | refusée (200 caractères au plus)      |
+      | texte | 8 000 caractères                                  | acceptée                              |
+      | texte | 8 001 caractères                                  | refusée (8 000 caractères au plus)    |
+      | texte | 8 000 caractères dont des sauts de ligne          | acceptée (un saut de ligne compte pour 1 caractère) |
+      | texte | 8 000 caractères entourés d'espaces               | acceptée (les espaces de début et de fin ne comptent pas) |
+
+  Scénario: Compteur de caractères
+    Quand je saisis le texte d'une actualité
+    Alors un compteur m'indique le nombre de caractères saisis sur 8 000
+
+  Scénario: Contenu contenant du code
+    Quand j'enregistre une actualité dont le texte contient "<script>alert(1)</script>"
+    Alors elle est enregistrée telle quelle, sans modification
+    Et l'aperçu et la page publique affichent ces caractères comme du texte, sans rien exécuter
+
+  Scénario: Aperçu
+    Étant donné que je rédige une actualité dans le formulaire
+    Quand je passe en mode "Aperçu"
+    Alors je vois le rendu public : titre, date et texte en paragraphes
+    Et l'aperçu suit ce que je tape, sans enregistrer
+    Et, tant que l'actualité n'a jamais été publiée, la mention "Brouillon, non publié" remplace la date
+
+  Scénario: Liste d'administration
+    Étant donné 3 actualités dont 2 publiées et 1 brouillon, modifiées à des moments différents
+    Quand j'ouvre la liste d'administration
+    Alors je vois les 3 actualités, la dernière modifiée en premier
+    Et chaque ligne affiche son titre, son statut ("Brouillon" ou "Publiée"), sa date de première publication ou "—", et sa dernière modification
+
+  Scénario: Filtre par statut
+    Étant donné des actualités en brouillon et des actualités publiées
+    Quand je choisis le filtre "Brouillons" puis "Publiées" puis "Tous"
+    Alors la liste ne montre que les actualités du statut choisi, ou toutes avec "Tous"
+
+  Scénario: Plus de 20 actualités en administration
+    Étant donné 45 actualités
+    Quand j'ouvre la liste d'administration
+    Alors je vois les 20 dernières modifiées
+    Et je peux passer à la page suivante
+
+  Scénario: Aucune actualité pour le filtre choisi
+    Étant donné qu'aucune actualité n'est en brouillon
+    Quand je choisis le filtre "Brouillons"
+    Alors un message indique "Aucune actualité ne correspond à ce filtre."
+
+  Scénario: Enregistrer avant de publier
+    Étant donné que j'ai modifié le formulaire sans enregistrer
+    Alors les boutons "Publier", "Dépublier" et "Supprimer" sont désactivés
+    Et une aide m'invite à enregistrer d'abord mes modifications
+
+  Scénario: Quitter un formulaire modifié
+    Étant donné que j'ai modifié le formulaire sans enregistrer
+    Quand je quitte la page
+    Alors une confirmation "Quitter sans enregistrer ?" me laisse rester ou quitter
+
+  Scénario: Double clic sur un bouton
+    Quand je clique deux fois de suite, très vite, sur "Publier" (ou "Enregistrer", "Supprimer")
+    Alors l'action n'est faite qu'une fois
+    Et aucun message d'erreur ne s'affiche
+
+  Scénario: Conflit de modification entre deux administrateurs
+    Étant donné qu'une actualité est ouverte chez deux administrateurs X et Y
+    Et que X enregistre une modification
+    Quand Y enregistre à son tour sa modification sans avoir rechargé
+    Alors l'enregistrement de Y est refusé
+    Et un message explique que l'actualité vient d'être modifiée par un autre administrateur, qu'il faut recharger la page et que ses modifications seront perdues
+    Et Y peut fermer le message pour recopier sa saisie
+    Et la version de X n'est pas écrasée
+
+  Scénario: Enregistrements simultanés
+    Quand deux administrateurs enregistrent en même temps une modification de la même actualité, à partir de la même version
+    Alors une seule modification est enregistrée
+    Et l'autre administrateur reçoit le message de conflit
+
+  Scénario: Publier une actualité déjà publiée
+    Étant donné une actualité que l'administrateur Y vient de publier, alors que ma page affiche encore un brouillon
+    Quand je clique sur "Publier"
+    Alors un message m'indique que l'actualité est déjà publiée
+    Et la fiche affiche son état actuel
+    Et sa date de publication n'est pas modifiée
+
+  Scénario: Dépublier une actualité qui n'est pas publiée
+    Étant donné une actualité que l'administrateur Y vient de dépublier, alors que ma page l'affiche encore publiée
+    Quand je clique sur "Dépublier"
+    Alors un message m'indique que l'actualité n'est pas publiée
+    Et la fiche affiche son état actuel
+
+  Scénario: Actualité introuvable en administration
+    Quand j'ouvre l'adresse d'administration d'une actualité qui n'existe pas
+    Alors un message indique "Actualité introuvable." avec un lien de retour à la liste
+
+  Scénario: Accès refusé aux actualités d'administration
+    Étant donné que je suis visiteur ou simple utilisateur
+    Quand j'ouvre une page ou une action d'administration des actualités (liste, fiche, création, publication, suppression)
+    Alors l'accès est refusé (connexion demandée pour un visiteur, "Accès réservé" pour un utilisateur)
+    Et aucune actualité n'est modifiée
+    Et un brouillon ne m'est jamais montré
 ```
 
 #### US-E2 — Gérer les événements *(modifiée : prix, capacité ; v4 : événement commencé, limites de saisie, lieu, suppression d'un brouillon ; v5 : recalcul des échéances)*
@@ -1231,7 +1527,7 @@ Fonctionnalité: Mon profil
 | R15 | Suppression d'un événement | Seulement s'il **n'a jamais eu de réservation**, quel qu'en soit le statut ; sinon on l'annule *(défaut)*. **Dès l'étape 2**, un admin peut supprimer (après confirmation) un **brouillon qui n'a jamais été publié** ; un événement qui a été publié, même dépublié depuis, ne peut pas être supprimé avant l'étape 7. |
 | R16 | Liste d'attente | Aucune au MVP *(défaut)*. |
 | R17 | Notifications | Aucun e-mail ni SMS automatique au MVP : les statuts sont visibles dans l'application et le contact se fait par téléphone ou WhatsApp *(défaut)*. |
-| R18 | Actualités | Brouillon / Publiée. Triées par date de publication décroissante, **10 par page** *(défaut)*. Suppression définitive autorisée. Texte simple, sans image au MVP *(défaut)*. |
+| R18 | Actualités *(précisée en v6, cahier RG-16)* | **Statuts** : Brouillon / Publiée. **Contenu** : **texte simple** ; **titre** 200 caractères au plus, **texte** 8 000 caractères au plus (espaces de début et de fin non comptés ; un saut de ligne compte pour 1), tous deux obligatoires ; **ni image, ni mise en forme, ni lien cliquable** ; le texte est **affiché tel quel** (une balise saisie s'affiche comme du texte, jamais exécutée) ; une ligne vide sépare deux paragraphes. **Date** : la date de publication est celle de la **première** publication ; elle est **conservée** à la dépublication et à la republication (l'actualité ne remonte pas en tête) et **n'est pas modifiée** par une modification ; pas de « Mise à jour le » ; affichée **sans l'heure**, au jour de Tunis (R26) ; **aucun auteur** affiché ni enregistré. **Liste publique** : seulement les publiées, **la plus récente d'abord**, à date égale dans un ordre stable, **10 par page** *(défaut)*, avec titre, date et **extrait automatique de 200 caractères au plus** (blancs et sauts de ligne ramenés à une espace, coupé sur un mot, suivi de « … » ; texte de 200 caractères ou moins : entier, sans « … »). **Visibilité** : brouillon, dépubliée, supprimée, inexistante ou adresse mal formée donnent la **même page « Contenu introuvable »**, y compris pour un admin sur l'adresse publique (il utilise l'aperçu). **Accueil** : « / » affiche les actualités. **Administration** : créer (en brouillon), modifier (brouillon ou publiée), prévisualiser, publier, dépublier, **supprimer** (depuis les deux statuts, après confirmation, définitif, sans dépublier d'abord). Liste admin : toutes les actualités, **dernière modification d'abord**, filtre « Tous / Brouillons / Publiées », 20 par page. **Deux admins** : l'enregistrement d'une modification est refusé si l'actualité a été modifiée entre-temps (conflit) ; publier une publiée ou dépublier un brouillon est refusé avec un message ; supprimer une actualité déjà supprimée donne « Cette actualité a déjà été supprimée. ». Ni image, ni épinglage, ni publication programmée au MVP *(défaut)*. |
 | R19 | Affichage public des événements | La **liste** montre les événements **publiés ou annulés qui ne sont pas terminés** (un événement en cours reste listé jusqu'à sa fin, avec « Réservations closes »), avec leur prix et leurs places restantes, triés du plus proche au plus lointain, **20 par page** *(défaut)*. Pas d'archive des événements passés dans la liste au MVP *(défaut)*. Le **détail** d'un événement publié ou annulé **reste accessible par son adresse même une fois terminé** (historique conservé, utile à « Mes réservations »). Un brouillon n'est jamais visible. |
 | R20 | Données d'un compte | **Prénom, nom, e-mail, téléphone, mot de passe** (conservé uniquement sous forme hachée), plus : la **date de création du compte** (affichée à l'utilisateur, US-F3) ; la **date de dernière connexion** (pour repérer les comptes inactifs depuis 3 ans, R25) ; le **consentement** (date d'acceptation et **version de la politique de confidentialité acceptée**, R24). Aucune autre donnée : en particulier ni date de naissance ni information d'âge. Le téléphone est **obligatoire** car il sert au contact avant la confirmation *(à confirmer en Q8)*. Format accepté : **uniquement « +216 » suivi de exactement 8 chiffres, numéro mobile ou fixe** (exemples : +216 20 123 456, +216 71 123 456). Refusés : saisie locale sans préfixe, préfixe « 00 », numéros internationaux. Les espaces de présentation sont tolérés à la saisie *(défaut)*. L'e-mail est unique, sans tenir compte des majuscules. La même règle de format s'applique au numéro de contact de l'association (R8, Q17). |
 | R21 | Mot de passe et connexion | Au moins **8 caractères**, dont une lettre et un chiffre *(défaut)*. Blocage **15 min après 5 échecs** *(défaut)*. Pas de vérification de l'e-mail au MVP *(défaut)*. |
@@ -1242,7 +1538,7 @@ Fonctionnalité: Mon profil
 | R26 | Heure de référence | Toutes les dates et heures sont en **heure de Tunis (Africa/Tunis, UTC+1, sans changement d'heure)**. |
 | R27 | Langue | Application **en français uniquement**. |
 | R28 | Modification d'un événement | Un admin peut modifier un événement (brouillon ou publié) tant qu'il n'est **ni terminé ni annulé**, **y compris s'il a déjà commencé**. Sur un événement commencé, la date de début **ne peut pas être déplacée dans le passé** (une date de début inchangée reste acceptée). Un événement **terminé** (heure de fin dépassée) ou **annulé** ne peut plus être modifié. La date de fin d'un événement commencé ne peut pas être placée dans le passé *(défaut, voir Q28)*. |
-| R29 | Limites de saisie des textes | **Titre** et **lieu** : 200 caractères au plus. **Description** : 4 000 caractères au plus. Titre, lieu et description sont obligatoires. Les limites de capacité et de prix sont en R11 et R12. |
+| R29 | Limites de saisie des textes | **Titre** et **lieu** : 200 caractères au plus. **Description** : 4 000 caractères au plus. Titre, lieu et description sont obligatoires. Les limites de capacité et de prix sont en R11 et R12. (Pour une actualité : R18.) |
 | R30 | Recalcul de l'échéance *(v5, QF-2)* | Quand un admin **change la date de début** d'un événement, l'échéance de chaque demande En attente **non échue** est recalculée avec la formule de R6 à partir du **nouveau début** : **ramenée** au nouveau début s'il est plus tôt ; **allongée** s'il est plus tard, **sans jamais dépasser 48 h après la demande**. Une demande **déjà échue n'est jamais ranimée**. Le délai d'annulation de 24 h (R9) se compte depuis le début **actuel**. Les réservations sont conservées (R12). |
 | R31 | Administrateur et réservation *(v5, QF-1)* | Un administrateur a aussi les droits d'un utilisateur : il peut **demander une place pour lui-même**, selon le même parcours (demande, confirmation par un admin, expiration, annulation). Aucun traitement spécial : sa demande apparaît dans les demandes à traiter comme les autres. |
 | R32 | Visibilité des coordonnées *(v5, QF-9)* | Les administrateurs voient **prénom, nom, téléphone et e-mail** des personnes ayant fait une demande, dans la liste des demandes à traiter et dans la liste des inscrits, pour traiter les demandes, les joindre, préparer l'accueil et prévenir en cas d'annulation. Ces données ne sont visibles ni des autres utilisateurs ni des visiteurs. Si le compte a été supprimé, la ligne affiche « Compte supprimé ». La politique de confidentialité le mentionne (version 1.1). |
@@ -1263,6 +1559,12 @@ Fonctionnalité: Mon profil
 - **(v4) Événement terminé** : le détail public doit permettre d'indiquer « terminé » (la liste publique du plan ne l'expose pas, voir le récapitulatif).
 - **(v5) Codes d'erreur** : le plan des réservations (§ 7) emploie `event_cancelled` et `event_ended`, absents de la liste des codes du § 4 du plan ; les libellés correspondants sont proposés dans `libelles-ecrans.md` § 11. Le plan prévoit aussi un message côté membre pour `reservation_state_changed` qui n'existe pas dans sa liste de messages (proposition en § 11 des libellés).
 - **(v5) Réservation « courante » d'un membre** : « À venir » = demande en attente ou confirmée dont l'événement **n'est pas terminé** (un événement en cours reste donc « À venir » jusqu'à sa fin) ; le plan (QF-7) ne le précise que pour les événements terminés. À confirmer avec la définition de `IsCurrentForMember`.
+- **(v6) Messages de `news_state_changed`** : le plan des actualités ne donne pas le texte affiché (il dit seulement « message puis relecture de la fiche »). `libelles-ecrans.md` § 14 propose « Cette actualité est déjà publiée. » et « Cette actualité n'est pas publiée. » : à aligner avec les messages du Domain (`AlreadyPublishedMessage`, `NotPublishedMessage`) ou à remplacer par les leurs.
+- **(v6) `concurrent_update` sur publier, dépublier, supprimer** : ces actions n'envoient pas de version (P-N4) mais l'API peut quand même répondre 409 `concurrent_update` ; le plan ne prévoit pas de libellé : le même dialogue que pour l'enregistrement est proposé (`libelles-ecrans.md` § 14).
+- **(v6) Page au-delà de la dernière** : l'API renvoie 200 avec une liste vide (plan § 9.3) et le plan dit « même traitement que la liste des événements », mais aucun critère n'existe pour les événements : le comportement visible (message ? retour à la première page ?) reste à préciser avant les écrans.
+- **(v6) Page « Contenu introuvable » commune** : le plan (§ 7.2) change le lien de `not-found` et `forbidden` en « Retour à l'accueil » ; les libellés des événements (« Retour aux événements ») et d'« Accès réservé » ont été alignés (`libelles-ecrans.md` § 3, § 4). Cela rend le lien « Retour aux événements » inutilisé.
+- **(v6) Date de première publication d'un brouillon dépublié** : la liste admin affiche la date conservée même pour un brouillon (colonne « Première publication » pour ne pas laisser croire qu'il est visible) ; le plan parle seulement de « date de publication ».
+- **(v6) Conflit de nom et limite du texte** : la limite de 8 000 caractères est vérifiée après suppression des espaces de début et de fin et normalisation des sauts de ligne (plan § 4) ; l'écran affiche le compteur brut : prévoir que le compteur et la validation ne se contredisent pas (le compteur peut afficher plus que la limite sans erreur à cause des espaces de fin).
 
 ---
 
@@ -1284,7 +1586,7 @@ Fonctionnalité: Mon profil
 | Q12 | Une **déclaration à l'INPDP** est-elle nécessaire pour ce traitement ? Qui s'en charge ? | À vérifier par l'association avant la mise en ligne. |
 | Q13 | Qui rédige la **politique de confidentialité**, et quel est le **contact** pour les questions sur les données ? | Un modèle simple fourni avec l'application ; contact : l'e-mail de l'association. |
 | Q14 | Combien de temps **garder** les comptes inactifs et l'historique des réservations ? | 3 ans d'inactivité ; historique rendu anonyme et conservé. |
-| Q15 | Les actualités ont-elles besoin d'**images** ou de pièces jointes ? Faut-il **archiver** les événements passés ? | Non au MVP (pas d'archive dans la liste ; le détail d'un événement terminé reste accessible, voir Q19). |
+| Q15 | Les actualités ont-elles besoin d'**images** ou de pièces jointes ? Faut-il **archiver** les événements passés ? | Non au MVP (pas d'archive dans la liste ; le détail d'un événement terminé reste accessible, voir Q19). Images : confirmé « non » en v6 (QN-4 et plan des actualités). |
 | Q16 | Quand la **politique de confidentialité change**, faut-il redemander l'accord aux membres déjà inscrits ? | Non au MVP : on conserve seulement la version acceptée à l'inscription ; à revoir plus tard. |
 | Q17 | Le **numéro de contact de l'association** (US-E8) doit-il suivre la même règle que le téléphone des membres (+216 + 8 chiffres) ? | **Résolue (v4)** : oui, même règle ; un numéro **fixe** tunisien est accepté (« +216 » + 8 chiffres, mobile ou fixe). (Plan d'étape 2 : E2-12.) |
 
@@ -1326,6 +1628,24 @@ Le porteur a accepté la valeur par défaut du plan pour chacune.
 
 Les décisions **P-R1 à P-R8** du plan sont acceptées : voir l'encadré « version 5 » en haut de ce document pour celles qui ont un effet fonctionnel.
 
+### Questions de la tranche « Actualités » (plan `technique/plan-actualites.md` § 14.1, QN-1 à QN-9) — toutes résolues en v6
+
+Le porteur a accepté la valeur par défaut du plan pour chacune.
+
+| # | Question | Décision | Origine | Où |
+|---|---|---|---|---|
+| QN-1 | **Longueur maximale** du texte d'une actualité ? | **8 000 caractères** (titre : 200, comme un événement). Texte brut. | Défaut du plan, accepté | R18, US-E1 |
+| QN-2 | Une actualité **dépubliée puis republiée** garde-t-elle sa date d'origine ? | **Oui** : elle ne remonte pas en tête de liste. | Défaut du plan, accepté | R18, US-B1, US-B2, US-E1 |
+| QN-3 | **Extrait** de la liste : automatique ou saisi ? Quelle longueur ? | **Automatique**, 200 caractères au plus, coupé sur un mot, suivi de « … ». | Défaut du plan, accepté | R18, US-B1 |
+| QN-4 | Afficher l'**auteur** ? | **Non** : aucune donnée personnelle publiée. | Défaut du plan, accepté | R18, US-B2 |
+| QN-5 | Les **adresses web** du texte doivent-elles être cliquables ? | **Non** au MVP (texte brut) ; peut venir plus tard. | Défaut du plan, accepté | R18, US-B2 |
+| QN-6 | Peut-on **supprimer directement** une actualité publiée ? | **Oui**, après une confirmation qui rappelle qu'elle disparaît du public. | Défaut du plan, accepté | R18, US-E1 |
+| QN-7 | Afficher « **Mise à jour le …** » ? | **Non** : seule la date de publication est affichée. | Défaut du plan, accepté | R18, US-B2 |
+| QN-8 | **Libellés** des écrans Actualités et place dans les menus ? | Validés tels que proposés par le plan ; « Actualités » en premier dans le menu public et dans le sous-menu Administration ; accueil « / » = actualités ; rédigés dans `libelles-ecrans.md` (v1.3). | Défaut du plan, accepté | `libelles-ecrans.md` § 2, 12, 13, 14 |
+| QN-9 | **Ordre de la liste admin** ? | Dernière modification d'abord ; filtre « Tous / Brouillons / Publiées ». | Défaut du plan, accepté | R18, US-E1 |
+
+Les décisions **P-N1 à P-N7** du plan sont acceptées : voir l'encadré « version 6 » en haut de ce document pour celles qui ont un effet fonctionnel.
+
 Questions restées ouvertes à la suite des décisions v4 :
 
 | # | Question | Valeur par défaut en attendant |
@@ -1364,6 +1684,7 @@ Si le temps manque, ces éléments peuvent passer en « plus tard » sans casser
 - Gestion des administrateurs depuis l'interface (promouvoir ou retirer un admin).
 - Modification du profil, export de mes données.
 - Numéro de contact par événement, images dans les actualités, archive des événements passés (page dédiée dans la liste ; le détail d'un événement terminé reste déjà accessible par son adresse).
+- **Actualités (v6)** : épinglage d'une actualité en tête, affichage de l'auteur, mention « Mise à jour le », adresses web cliquables et mise en forme du texte, publication programmée.
 - Suivi des remboursements, récapitulatif des encaissements par événement.
 - Purge automatique des comptes inactifs, statistiques de fréquentation.
 - Événements réservés aux adhérents.
@@ -1387,3 +1708,5 @@ L'idée : construire d'abord le **cœur métier testable** (la réservation, son
 Les étapes 1 à 9 côté API correspondent à la semaine 1, avec les tests tirés des scénarios ci-dessus (le tableau des transitions du § 2 donne une liste de cas à tester). La semaine 2 reprend le même ordre pour les écrans Angular et l'espace admin.
 
 Note v5 : le plan `technique/plan-reservations.md` regroupe ces étapes en tranches : **A** (demander, suivre, annuler : US-D1 à D4, partie membre de US-C2), **B** (traiter : US-E4 à E7, US-D5 « expirée ne se confirme plus »), **C** (expiration automatique en arrière-plan, US-D5). Les scénarios de recalcul de l'échéance (US-D5) relèvent de la tranche A.
+
+Note v6 : la tranche « Actualités » (`technique/plan-actualites.md`) reste à l'étape 8 : **après** l'annulation d'un événement (US-E3) et les inscrits, conformément au cahier § 8 (P-N7). Elle n'a aucun lien avec les réservations. Deux moitiés : API (US-E1, US-B1, US-B2), puis écrans.

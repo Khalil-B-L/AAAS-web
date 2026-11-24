@@ -1,0 +1,22 @@
+.news-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.news-card {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+}
+
+.news-card__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+}
+
+.news-card__excerpt {
+  overflow-wrap: anywhere;
+}

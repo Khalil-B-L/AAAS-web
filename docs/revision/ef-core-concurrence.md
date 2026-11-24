@@ -138,3 +138,53 @@ Un `DbUpdateConcurrencyException` dit « la ligne a changé », pas « la règle
 - **N+1 évité** : la liste des inscrits charge les réservations (1 requête), puis **toutes** les coordonnées (membres et admins « Payée ») en **une** requête `WHERE Id IN (...)` via le port `IIdentityService.GetContactsAsync` (Application ne voit pas `AppUser`, ADR 0001). Contrat : un compte supprimé est **absent** du dictionnaire → « Compte supprimé ».
 
 Question d'entretien : **pourquoi ne pas verrouiller aussi la confirmation ?** Elle ne change pas l'occupation (En attente et Confirmée occupent toutes deux une place) ; verrouiller allongerait la file d'attente des demandes sur un événement très demandé, sans rien garantir de plus.
+
+## 13. Actualités : `nvarchar(max)`, `CHECK`, projection `SUBSTRING`, *offset* contre *keyset*
+
+### `nvarchar(n)` contre `nvarchar(max)`
+
+- `nvarchar(n)` va jusqu'à **4 000** caractères (8 000 octets, une page de données). Au-delà, il faut `nvarchar(max)` (jusqu'à 2 Go), stocké hors de la ligne quand il dépasse la page.
+- `nvarchar(max)` ne peut pas être **clé** d'index (il peut figurer en `INCLUDE`). Ici `News.Content` n'est ni indexé ni trié : aucune conséquence.
+- La **limite métier** (8 000 caractères) est dans le Domain (`NewsRules`), comptée après normalisation. La colonne n'est que le contenant. EF : une propriété `string` sans `HasMaxLength` devient `nvarchar(max)`.
+
+### `CHECK` comme filet
+
+```sql
+CONSTRAINT [CK_News_Status] CHECK ([Status] IN (1, 2)),
+CONSTRAINT [CK_News_PublishedAt] CHECK ([Status] = 1 OR [PublishedAt] IS NOT NULL)
+```
+
+Déclarés dans `NewsArticleConfiguration` (`ToTable("News", t => t.HasCheckConstraint(...))`). Un `UPDATE` SQL direct qui viole la règle échoue avec l'**erreur 547** (testé dans `AdminNewsTests.Check_constraints`). Le second `CHECK` exprime une implication : « publiée ⇒ datée » s'écrit `NOT publiée OR datée`.
+
+### Projection partielle : ne pas transférer le texte entier
+
+```csharp
+.Select(n => new { n.Id, n.Title, n.PublishedAt, Head = n.Content.Substring(0, NewsRules.ExcerptSourceLength + 1) })
+```
+
+EF traduit en `SUBSTRING([n].[Content], 1, 401)`. La liste ne lit que 401 caractères par ligne au lieu de 8 000. Le 401ᵉ caractère indique s'il reste une suite (« … » même si le début, une fois les espaces réduits, tient en 200). L'extrait est ensuite coupé en mémoire par une fonction pure du Domain (`NewsRules.Excerpt`). Vérifié dans les journaux EF (`PublicNewsTests.Long_text_excerpt`, catégorie `Microsoft.EntityFrameworkCore.Database.Command` passée en `Information` pour cette classe).
+
+### Pagination *offset* contre *keyset*
+
+| | *Offset* (retenu, ADR 0011) | *Keyset* / curseur |
+|---|---|---|
+| SQL | `ORDER BY PublishedAt DESC, Id OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY` | `WHERE PublishedAt < @d OR (PublishedAt = @d AND Id > @id) ORDER BY … FETCH NEXT 10` |
+| Coût | le serveur lit puis jette les lignes de l'`OFFSET` : coût qui grandit avec le numéro de page | constant (recherche dans l'index) |
+| Stabilité | une insertion pendant la lecture décale tout (doublon d'une page à l'autre) | stable |
+| Navigation | « Page 3 sur 5 », lien direct `?page=3` | seulement « suivant » / « précédent » |
+
+Retenir : *keyset* pour les flux infinis et les gros volumes ; *offset* pour les listes courtes avec numéros de page. Dans les deux cas, il faut un **tri total** (`ThenBy(Id)`), sinon deux lignes de même date peuvent changer d'ordre entre deux requêtes (testé : `PublicNewsTests.Stable_order_on_same_date`). Le projet a maintenant `QueryablePaging.Page<T>(query)` générique, et `PagingQuery` reçoit sa taille par défaut **par le constructeur** : un initialiseur de propriété ne se redéfinit pas dans une classe dérivée.
+
+### Concurrence sans verrou
+
+Les actualités n'ont **pas** de verrou `UPDLOCK` : aucune règle ne dépend d'autres lignes (pas de décompte comme pour les places). `rowversion` suffit (ADR 0006, 0022) : `PUT` avec `version` donne 409 si elle est périmée ; publier, dépublier et supprimer se font sans `version`, mais le `rowversion` chargé reste dans le `WHERE` de l'`UPDATE`/`DELETE` et fait échouer une écriture croisée (`DbUpdateConcurrencyException` → 409).
+
+### Questions d'entretien
+
+1. **Pourquoi `nvarchar(max)` plutôt que `nvarchar(8000)` ?** `nvarchar(n)` s'arrête à 4 000 caractères ; au-delà, c'est `max`.
+2. **Pourquoi ajouter `Id` au tri d'une liste paginée ?** Sans tri total, SQL Server peut rendre deux lignes de même clé dans un ordre différent à chaque requête : une ligne apparaît sur deux pages, ou sur aucune.
+3. **Quand utiliser un verrou pessimiste plutôt que `rowversion` ?** Quand une règle porte sur **plusieurs lignes** (capacité d'un événement) : `rowversion` ne protège qu'une ligne.
+
+### Exercice (facultatif)
+
+Écrivez la version *keyset* de `PublicNewsService.ListAsync` (paramètres `afterPublishedAt`, `afterId`) et comparez les plans d'exécution sur 100 000 lignes.

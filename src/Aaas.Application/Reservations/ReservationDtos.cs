@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Aaas.Application.Common;
 using Aaas.Application.Events;
 using Aaas.Domain.Events;
 using Aaas.Domain.Reservations;

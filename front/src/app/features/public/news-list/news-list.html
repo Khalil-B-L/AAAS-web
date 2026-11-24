@@ -1,0 +1,44 @@
+<section class="page">
+  <h1>Actualités</h1>
+
+  @if (errorMessage(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="news.reload()">Réessayer</button>
+    </div>
+  } @else if (news.isLoading()) {
+    <app-loading />
+  } @else if (news.value(); as result) {
+    @if (result.items.length === 0 && result.totalCount === 0) {
+      <p class="muted">Aucune actualité pour le moment.</p>
+    } @else if (result.items.length === 0) {
+      <!-- Page au-delà de la dernière (lien ancien, actualité dépubliée entre-temps) : l'API renvoie une liste vide. -->
+      <p>Cette page ne contient plus d'actualité. <a routerLink="/actualites">Revenir à la première page</a></p>
+    } @else {
+      <ul class="news-cards">
+        @for (item of result.items; track item.id) {
+          <li>
+            <article class="news-card">
+              <h2 class="news-card__title">{{ item.title }}</h2>
+              <p class="muted">
+                Publiée le <time [attr.datetime]="item.publishedAt">{{ item.publishedAt | date: dayFormat }}</time>
+              </p>
+              <!-- Interpolation : l'extrait est du texte brut, affiché tel quel (ADR 0023). -->
+              <p class="news-card__excerpt">{{ item.excerpt }}</p>
+              <a [routerLink]="['/actualites', item.id]">
+                Lire la suite<span class="visually-hidden"> : {{ item.title }}</span>
+              </a>
+            </article>
+          </li>
+        }
+      </ul>
+    }
+
+    <app-pager
+      [page]="result.page"
+      [pageSize]="pageSize"
+      [totalCount]="result.totalCount"
+      (pageChange)="goToPage($event)"
+    />
+  }
+</section>

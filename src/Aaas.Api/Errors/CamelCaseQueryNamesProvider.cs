@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Aaas.Application.Events;
+using Aaas.Application.Common;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 
 namespace Aaas.Api.Errors;

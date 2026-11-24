@@ -1,5 +1,5 @@
 <header class="toolbar">
-  <a class="brand" routerLink="/evenements" (click)="closeMenu()">
+  <a class="brand" routerLink="/" (click)="closeMenu()">
     <app-brand-logo [height]="48" />
     <span>{{ appInfo.name }}</span>
   </a>
@@ -21,6 +21,7 @@
       <span class="greeting">Bonjour {{ auth.firstName() }}</span>
     }
 
+    <a mat-button routerLink="/actualites" routerLinkActive="active" (click)="closeMenu()">Actualités</a>
     <a mat-button routerLink="/evenements" routerLinkActive="active" (click)="closeMenu()">Événements</a>
 
     @if (auth.isAdmin()) {

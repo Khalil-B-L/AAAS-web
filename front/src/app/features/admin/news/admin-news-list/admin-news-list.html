@@ -1,0 +1,67 @@
+<section class="page page--wide">
+  <div class="title-row">
+    <h1>Administration — actualités</h1>
+    <a mat-flat-button routerLink="nouvelle">Nouvelle actualité</a>
+  </div>
+
+  <div class="filters">
+    <mat-form-field>
+      <mat-label>Statut</mat-label>
+      <mat-select [value]="status()" (selectionChange)="onStatusChange($event.value)">
+        <mat-option [value]="null">Tous</mat-option>
+        <mat-option value="Draft">Brouillons</mat-option>
+        <mat-option value="Published">Publiées</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (errorMessage(); as message) {
+    <div class="banner banner--error" role="alert">
+      <p>{{ message }}</p>
+      <button mat-stroked-button type="button" (click)="news.reload()">Réessayer</button>
+    </div>
+  } @else if (news.isLoading()) {
+    <app-loading />
+  } @else if (news.value(); as result) {
+    @if (result.items.length === 0) {
+      <p class="muted">Aucune actualité ne correspond à ce filtre.</p>
+    } @else {
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Titre</th>
+              <th scope="col">Statut</th>
+              <th scope="col">Première publication</th>
+              <th scope="col">Dernière modification</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of result.items; track item.id) {
+              <tr>
+                <td><a [routerLink]="[item.id]">{{ item.title }}</a></td>
+                <!-- Statut écrit en toutes lettres, pas seulement une couleur (accessibilité). -->
+                <td><span class="chip">{{ statusLabels[item.status] }}</span></td>
+                <td>
+                  @if (item.publishedAt) {
+                    {{ item.publishedAt | date: dateFormat }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>{{ item.updatedAt | date: dateFormat }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <app-pager
+      [page]="result.page"
+      [pageSize]="pageSize"
+      [totalCount]="result.totalCount"
+      (pageChange)="goToPage($event)"
+    />
+  }
+</section>

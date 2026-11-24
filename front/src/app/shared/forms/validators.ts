@@ -100,3 +100,18 @@ export const endAfterStart: ValidatorFn = (group: AbstractControl): ValidationEr
   }
   return endsAt > startsAt ? null : { endBeforeStart: true };
 };
+
+/**
+ * Texte obligatoire et limité, compté COMME L'API : \r\n → \n puis espaces de début et de fin retirés
+ * (NewsRules côté .NET). Validators.required accepterait « "   " » et Validators.maxLength compterait les espaces
+ * autour : le front contredirait alors le serveur. Clés d'erreur standard (required, maxlength) → mêmes messages.
+ */
+export function trimmedText(maxLength: number): ValidatorFn {
+  return (control: AbstractControl<string>): ValidationErrors | null => {
+    const length = (control.value ?? '').replace(/\r\n?/g, '\n').trim().length;
+    if (length === 0) {
+      return { required: true };
+    }
+    return length > maxLength ? { maxlength: { requiredLength: maxLength, actualLength: length } } : null;
+  };
+}

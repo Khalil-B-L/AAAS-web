@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Projet** | AAAS — application web de l'association |
-| **Version** | 1.4 — 24/11/2026 |
+| **Version** | 1.5 — 24/11/2026 |
 | **Porteur** | Khalil-B-L |
 | **Statut** | Validé pour démarrage — toute modification passe par l'historique en fin de document |
 
@@ -41,7 +41,7 @@ Le projet a un **double objectif** :
 
 ### 4.1 Dans le périmètre (MVP)
 - Comptes : inscription, connexion, déconnexion, suppression du compte.
-- Actualités : consultation publique ; création, modification, publication et dépublication par les admins.
+- Actualités : consultation publique (les actualités sont la **page d'accueil** du site) ; création, modification, aperçu, publication, dépublication et suppression par les admins ; texte simple (RG-16).
 - Événements : consultation publique avec places restantes ; gestion complète par les admins (brouillon, modification, publication, annulation, suppression d'un brouillon jamais publié). Le détail d'un événement terminé reste consultable par son adresse (historique conservé).
 - Réservations : demande, validation par l'admin, expiration automatique, annulation, suivi.
 - Paiement **hors ligne** : prix affiché, marquage « payé » par l'admin.
@@ -54,6 +54,7 @@ Le projet a un **double objectif** :
 - Plusieurs places par réservation (accompagnants).
 - Application mobile native (le site doit en revanche être utilisable sur mobile).
 - Langue arabe (français uniquement).
+- **Actualités : images, auteur affiché, épinglage, mise en forme du texte (gras, titres…), adresses web cliquables, mention « Mise à jour le », publication programmée** (RG-16).
 
 ### 4.3 Phase 2 (semaine 4)
 - **Assistant** qui répond aux questions des membres à partir des documents de l'association (statuts, règlement, FAQ, descriptions d'événements), en citant ses sources (RAG avec Azure OpenAI).
@@ -97,6 +98,7 @@ Le détail (user stories, critères d'acceptation Gherkin) est dans [`fonctionne
 | RG-13 | Limites de saisie d'un événement : **capacité** entière de 1 à 10 000 ; **prix** de 0 à 99 999,999 TND ; **titre** et **lieu** : 200 caractères au plus ; **description** : 4 000 caractères au plus. |
 | RG-14 | Visibilité publique d'un événement : la liste ne montre que les événements **publiés ou annulés qui ne sont pas terminés** (un événement en cours reste donc listé, sans réservation possible), **20 par page**. Le **détail** d'un événement publié ou annulé reste accessible par son adresse **même une fois terminé** (historique conservé, utile aux « Mes réservations »). Un brouillon n'est jamais visible du public. |
 | RG-15 | **Visibilité des coordonnées par les administrateurs.** Les administrateurs voient le **prénom, le nom, le téléphone et l'e-mail** des personnes qui ont fait une demande (liste des demandes à traiter et liste des inscrits d'un événement), pour traiter les demandes, les joindre, préparer l'accueil et prévenir en cas d'annulation. Ces coordonnées ne sont visibles **ni des autres membres ni des visiteurs**. La politique de confidentialité le mentionne (§ 6.4). Une réservation dont le compte a été supprimé s'affiche « Compte supprimé », sans coordonnées. |
+| RG-16 | **Actualités.** (a) **Statuts** : Brouillon ou Publiée. Les visiteurs ne voient que les actualités publiées ; une actualité en brouillon, dépubliée, inexistante ou dont l'adresse est mal formée donne **la même page « Contenu introuvable »** (même pour un admin sur l'adresse publique : il utilise l'aperçu). (b) **Contenu** : **texte simple** ; **titre** 200 caractères au plus, **texte** 8 000 caractères au plus (espaces de début et de fin non comptés), tous deux obligatoires ; ni image, ni mise en forme, ni adresse web cliquable. Le texte est **toujours affiché tel quel** : une balise saisie (par exemple `<script>`) s'affiche comme du texte et n'est jamais exécutée. Une ligne vide sépare deux paragraphes. (c) **Date** : la date de publication est celle de la **première** publication ; elle est **conservée** si l'actualité est dépubliée puis republiée (elle ne remonte pas en tête de liste) et **n'est pas modifiée** par une modification du texte ; aucune mention « Mise à jour le » ; elle est affichée **sans l'heure**, au jour de **Tunis**. Aucun **auteur** n'est affiché ni enregistré : aucune donnée personnelle n'est collectée par les actualités. (d) **Liste publique** : actualités publiées, **la plus récente d'abord**, **10 par page**, avec titre, date et un **extrait automatique de 200 caractères au plus** (coupé sur un mot, suivi de « … »). (e) **Administration** : un admin crée, modifie (brouillon ou publiée), **prévisualise**, publie, dépublie et **supprime** une actualité ; la suppression est **définitive**, possible depuis les deux statuts (y compris une actualité publiée, sans dépublier d'abord) et demande une confirmation. La liste admin montre toutes les actualités, **la dernière modifiée d'abord**, avec un filtre par statut, 20 par page. (f) **Deux administrateurs en même temps** : l'enregistrement d'une actualité modifiée entre-temps par un autre admin est refusé (la saisie n'écrase jamais la version plus récente) ; publier une actualité déjà publiée ou dépublier un brouillon est refusé avec un message. |
 
 Les valeurs par défaut (48 h, 24 h) sont **paramétrables dans la configuration de l'application** (pas modifiables depuis l'interface au MVP) et peuvent évoluer selon les réponses de l'association (questions ouvertes dans `fonctionnel/mvp.md`).
 
@@ -105,11 +107,12 @@ Les valeurs par défaut (48 h, 24 h) sont **paramétrables dans la configuration
 ### 6.1 Ergonomie
 - Interface en **français**, compréhensible par des personnes peu à l'aise avec l'informatique.
 - Site **responsive** : utilisable confortablement sur smartphone.
-- Heures affichées à l'heure de **Tunis** (`Africa/Tunis`, UTC+1, sans changement d'heure) ; stockage en UTC.
+- Heures affichées à l'heure de **Tunis** (`Africa/Tunis`, UTC+1, sans changement d'heure) ; stockage en UTC. La date d'une actualité s'affiche sans l'heure, avec le jour de Tunis (RG-16).
 
 ### 6.2 Sécurité
 - Mots de passe hachés (ASP.NET Core Identity), authentification par **JWT**.
 - Autorisation vérifiée **côté API** pour chaque action ; un membre n'accède jamais aux réservations d'un autre.
+- Les textes saisis par les administrateurs (actualités) sont **toujours affichés comme du texte**, jamais interprétés comme du code (protection contre l'injection de scripts, RG-16).
 - **Aucun secret** dans le dépôt : user-secrets en local, variables d'environnement dans Docker, **Azure Key Vault** en production via Managed Identity.
 - HTTPS en production ; CORS limité au front.
 
@@ -202,3 +205,4 @@ Une fonctionnalité est **terminée** quand :
 | 1.2 | 19/11/2026 | Décisions du porteur sur les questions de l'étape 2 : (1) un événement déjà commencé peut être modifié, pas un événement terminé ou annulé (RG-12, nouvelle) ; (2) le détail d'un événement terminé reste accessible, la liste ne montre que les non terminés, 20 par page (RG-14, nouvelle) ; (3) limites de saisie : capacité 1 à 10 000, prix jusqu'à 99 999,999 TND, titre et lieu 200 caractères, description 4 000 (RG-13, nouvelle) ; (4) un numéro fixe tunisien est accepté, soit « +216 » + 8 chiffres mobile ou fixe, aussi pour le numéro de contact de l'association (RG-11) ; (5) un admin peut retirer le numéro de contact (RG-10) ; (6) un brouillon jamais publié peut être supprimé dès l'étape 2 (RG-07, § 4.1) ; (7) changement de lieu : pas d'avertissement aux inscrits (RG-12). Détail et critères d'acceptation dans `fonctionnel/mvp.md` (version 4). |
 | 1.3 | 23/11/2026 | Décision du porteur (question P-1) : le planning (§ 8) passe en **tranches verticales** (pour chaque étape : API, puis ses écrans, puis tests et documentation) au lieu de « toute l'API en S1, tous les écrans en S2 ». Aucun changement de périmètre ni de règle. Valeurs par défaut du plan du front (UX-1 à UX-11, Q-T1, Q-T2) validées. Politique de confidentialité provisoire : `fonctionnel/politique-confidentialite.md` ; libellés des écrans : `fonctionnel/libelles-ecrans.md`. |
 | 1.4 | 24/11/2026 | Décisions du porteur sur la tranche « Réservations » (plan `technique/plan-reservations.md`, questions QF-1 à QF-10 : valeurs par défaut acceptées ; P-R1 à P-R8 acceptées) : (1) **échéance** d'une demande définie précisément et **recalculée** quand l'admin change la date de début, sans ranimer une demande échue ; le délai de 24 h d'annulation se compte depuis le début **actuel** (RG-04, RG-05, RG-12) ; (2) un administrateur peut demander une place pour lui-même ; pas de limite de nouvelles demandes après un refus (RG-03) ; (3) mention « payée » posable à tout moment, même après la fin de l'événement, et retirable même sur une réservation annulée (RG-08) ; (4) **nouvelle RG-15** : les administrateurs voient prénom, nom, téléphone et e-mail des inscrits, ce que la politique de confidentialité doit dire (§ 6.4) ; (5) délais 48 h / 24 h en configuration, non modifiables depuis l'interface (§ 5.2). Aucun changement de périmètre. Détail et critères d'acceptation dans `fonctionnel/mvp.md` (version 5). |
+| 1.5 | 24/11/2026 | Décisions du porteur sur la tranche « Actualités » (plan `technique/plan-actualites.md`, questions QN-1 à QN-9 : valeurs par défaut acceptées ; P-N1 à P-N7 acceptées ; ADR 0022 et 0023) : **nouvelle RG-16** qui précise les actualités : (1) texte simple, 8 000 caractères au plus (titre 200), sans image, sans lien cliquable, affiché tel quel (une balise saisie s'affiche comme du texte) ; (2) une actualité republiée garde sa date de première publication, pas de « Mise à jour le », pas d'auteur affiché ; (3) extrait automatique de 200 caractères, 10 actualités par page ; (4) suppression directe d'une actualité publiée après confirmation ; (5) aperçu dans le formulaire admin ; liste admin triée par dernière modification avec filtre par statut ; (6) page d'accueil `/` = actualités (§ 4.1) ; (7) actualité en brouillon, dépubliée, inexistante ou adresse mal formée : même page « Contenu introuvable ». § 4.2 : hors périmètre explicités (images, auteur, épinglage, mise en forme, liens cliquables, publication programmée) ; § 6.1 et § 6.2 : date sans heure au jour de Tunis, texte jamais interprété comme du code. L'ordre de réalisation (§ 8) est inchangé : actualités après l'annulation d'événement et les inscrits (P-N7). Aucun changement de périmètre majeur (les actualités étaient déjà au MVP). Détail et critères d'acceptation dans `fonctionnel/mvp.md` (version 6). |

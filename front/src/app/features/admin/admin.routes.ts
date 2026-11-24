@@ -11,6 +11,24 @@ export const ADMIN_ROUTES: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'evenements' },
       {
+        path: 'actualites',
+        title: 'Administration — actualités',
+        loadComponent: () => import('./news/admin-news-list/admin-news-list').then((m) => m.AdminNewsList),
+      },
+      {
+        // Déclarée AVANT « actualites/:id » : sinon « nouvelle » serait pris pour un identifiant.
+        path: 'actualites/nouvelle',
+        title: 'Nouvelle actualité',
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () => import('./news/admin-news-form/admin-news-form').then((m) => m.AdminNewsForm),
+      },
+      {
+        path: 'actualites/:id',
+        title: "Modifier l'actualité",
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () => import('./news/admin-news-form/admin-news-form').then((m) => m.AdminNewsForm),
+      },
+      {
         path: 'evenements',
         title: 'Administration — événements',
         loadComponent: () => import('./events/admin-event-list/admin-event-list').then((m) => m.AdminEventList),

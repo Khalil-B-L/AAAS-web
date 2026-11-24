@@ -4,8 +4,19 @@ import { adminGuard, authGuard, guestGuard } from './core/auth/auth.guards';
 // Chaque page est chargée à la demande (loadComponent) : son code est un fichier JS séparé (« chunk »),
 // téléchargé à la première visite. L'espace admin entier est un chunk protégé par canMatch.
 export const routes: Routes = [
-  // Pas encore d'actualités (étape 8) : l'accueil mène aux événements (UX-3).
-  { path: '', pathMatch: 'full', redirectTo: 'evenements' },
+  // Accueil = actualités (UX-3). pathMatch: 'full' est OBLIGATOIRE sur la route vide : sinon toute URL, qui
+  // « commence par rien », serait redirigée. Après une connexion, on arrive toujours sur /evenements.
+  { path: '', pathMatch: 'full', redirectTo: 'actualites' },
+  {
+    path: 'actualites',
+    title: 'Actualités',
+    loadComponent: () => import('./features/public/news-list/news-list').then((m) => m.NewsList),
+  },
+  {
+    path: 'actualites/:id',
+    title: 'Actualité',
+    loadComponent: () => import('./features/public/news-detail/news-detail').then((m) => m.NewsDetail),
+  },
   {
     path: 'evenements',
     title: 'Événements',

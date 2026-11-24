@@ -42,6 +42,11 @@ export const VALIDATION_MESSAGES: Record<string, FieldMessages> = {
     required: 'Le titre est obligatoire.',
     maxlength: 'Le titre ne doit pas dépasser 200 caractères.',
   },
+  // Actualités (NewsRules) : texte compté après Trim et \r\n → \n.
+  content: {
+    required: 'Le texte est obligatoire.',
+    maxlength: 'Le texte ne doit pas dépasser 8 000 caractères.',
+  },
   location: {
     required: 'Le lieu est obligatoire.',
     maxlength: 'Le lieu ne doit pas dépasser 200 caractères.',

@@ -10,7 +10,7 @@ namespace Aaas.Application.Events;
 public sealed class PublicEventService(IAppDbContext db, EventOccupancyReader occupancyReader, TimeProvider time)
 {
     // Même message pour un brouillon et un identifiant inconnu : on ne révèle pas l'existence d'un brouillon.
-    public const string NotFoundMessage = "Contenu introuvable.";
+    public const string NotFoundMessage = NotFoundMessages.PublicContent;
 
     /// <summary>Publiés ou annulés, non terminés, du plus proche au plus lointain (RG-14, ADR 0011).</summary>
     public async Task<PagedResult<EventSummaryDto>> ListAsync(PublicEventListQuery query, CancellationToken cancellationToken)

@@ -1,0 +1,139 @@
+@switch (loadState()) {
+  @case ('loading') {
+    <app-loading />
+  }
+  @case ('not-found') {
+    <!-- Adresse admin : message propre à l'administration (libellés § 13), pas la page publique. -->
+    <section class="page">
+      <h1>Actualité introuvable.</h1>
+      <a routerLink="/admin/actualites">Retour à la liste</a>
+    </section>
+  }
+  @case ('error') {
+    <section class="page">
+      <div class="banner banner--error" role="alert">
+        <p>{{ loadError() }}</p>
+        <button mat-stroked-button type="button" (click)="reload()">Réessayer</button>
+      </div>
+    </section>
+  }
+  @default {
+    <section class="page">
+      <a routerLink="/admin/actualites">← Retour à la liste</a>
+      <h1>{{ isNew() ? 'Nouvelle actualité' : "Modifier l'actualité" }}</h1>
+
+      @if (news(); as n) {
+        <p class="meta">
+          <span class="chip">{{ statusLabel() }}</span>
+          @if (n.publishedAt) {
+            <span class="muted">Première publication le {{ n.publishedAt | date: detailFormat }}</span>
+          }
+        </p>
+      }
+
+      @if (errorMessage(); as message) {
+        <p class="banner banner--error" role="alert">{{ message }}</p>
+      }
+
+      <!-- Bascule : deux boutons avec aria-pressed (état « enfoncé » annoncé par les lecteurs d'écran). -->
+      <div class="toggle" role="group" aria-label="Mode d'affichage">
+        <button mat-stroked-button type="button" [attr.aria-pressed]="!preview()" (click)="preview.set(false)">
+          Modifier
+        </button>
+        <button mat-stroked-button type="button" [attr.aria-pressed]="preview()" (click)="preview.set(true)">
+          Aperçu
+        </button>
+      </div>
+
+      @if (preview()) {
+        <!-- Même composant que la page publique : l'aperçu suit la saisie (signal values()). -->
+        <div class="preview">
+          <app-news-article
+            [title]="values().title"
+            [content]="values().content"
+            [publishedAt]="news()?.publishedAt ?? null"
+            [headingLevel]="2"
+          />
+        </div>
+      }
+
+      <!-- Le formulaire reste dans le DOM pendant l'aperçu ([hidden]) : saisie et état « modifié » sont conservés. -->
+      <form class="form-grid" [formGroup]="form" (ngSubmit)="save()" novalidate [hidden]="preview()">
+        <mat-form-field>
+          <mat-label>Titre</mat-label>
+          <input matInput formControlName="title" />
+          <mat-hint align="end">{{ titleLength() }} / {{ titleMax }}</mat-hint>
+          <mat-error><app-field-errors [control]="form.controls.title" field="title" /></mat-error>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Texte</mat-label>
+          <textarea matInput formControlName="content" rows="16"></textarea>
+          <!-- Les <mat-hint> sont reliés au champ par aria-describedby (Material le fait seul). -->
+          <mat-hint>
+            Texte simple : la mise en forme et les adresses web ne sont pas interprétées. Une ligne vide sépare deux
+            paragraphes.
+          </mat-hint>
+          <mat-hint align="end">{{ contentLength() | number }} / {{ contentMax | number }}</mat-hint>
+          <mat-error><app-field-errors [control]="form.controls.content" field="content" /></mat-error>
+        </mat-form-field>
+        <!-- Annoncé seulement près de la limite, pour ne pas lire le compteur à chaque frappe. -->
+        <p class="visually-hidden" aria-live="polite">
+          @if (announceRemaining()) {
+            {{ contentRemaining() >= 0 ? 'Caractères restants : ' + contentRemaining() : 'Limite dépassée.' }}
+          }
+        </p>
+      </form>
+
+      <div class="actions">
+        <button mat-flat-button type="button" [disabled]="busy()" (click)="save()">Enregistrer</button>
+        <a mat-button routerLink="/admin/actualites">Annuler</a>
+        @if (busy()) {
+          <span class="muted" role="status">Envoi en cours…</span>
+        }
+      </div>
+
+      @if (!isNew()) {
+        <div class="state-actions">
+          <h2>Publication</h2>
+          @if (dirty()) {
+            <p class="muted" id="aide-actions">Enregistrez d'abord vos modifications.</p>
+          }
+          <div class="actions">
+            @if (isPublished()) {
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="busy() || dirty()"
+                [attr.aria-describedby]="dirty() ? 'aide-actions' : null"
+                (click)="unpublish()"
+              >
+                Dépublier
+              </button>
+            } @else {
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="busy() || dirty()"
+                [attr.aria-describedby]="dirty() ? 'aide-actions' : null"
+                (click)="publish()"
+              >
+                Publier
+              </button>
+            }
+            <button
+              mat-stroked-button
+              type="button"
+              class="danger"
+              [disabled]="busy() || dirty()"
+              [attr.aria-describedby]="dirty() ? 'aide-actions' : null"
+              (click)="remove()"
+            >
+              Supprimer
+            </button>
+          </div>
+        </div>
+      }
+    </section>
+  }
+}

@@ -1,6 +1,6 @@
 # État d'avancement et reprise — AAAS
 
-> Tenu par l'agent `expert-technique`. **But : reprendre le projet depuis un clone Git neuf, sans contexte de session.** Mis à jour le 24/11/2026, à la fin de la **tâche A de la tranche Réservations** (demander, suivre, annuler).
+> Tenu par l'agent `expert-technique`. **But : reprendre le projet depuis un clone Git neuf, sans contexte de session.** Mis à jour le 24/11/2026, à la fin de la **tranche Actualités** (étape 8, § 1.11).
 > Document de référence du périmètre : [`docs/cahier-des-charges.md`](../cahier-des-charges.md) ; user stories : [`docs/fonctionnel/mvp.md`](../fonctionnel/mvp.md) (v5) ; libellés : [`docs/fonctionnel/libelles-ecrans.md`](../fonctionnel/libelles-ecrans.md) (v1.1) ; consignes de travail : [`CLAUDE.md`](../../CLAUDE.md).
 
 ## 1. Où en est-on (résumé)
@@ -13,8 +13,10 @@
 | **Réservations, tâche A** — demander, suivre, annuler (membre) | **fait (24/11), à relire** | § 1.5 à 1.8 ; plan [`plan-reservations.md`](plan-reservations.md) ; ADR 0004 à 0006 et 0018 à 0021 **acceptés** |
 | **Réservations, tâche B** — traitement par l'admin (demandes à traiter, inscrits, confirmer, refuser, annuler, « Payée ») | **fait (24/11), à relire** | § 1.10 |
 | **Réservations, tâche C** — expiration périodique (`BackgroundService`, seulement après activité de l'API) | **fait (24/11), à relire** | § 1.9 |
-| Actualités, suppression de compte, annulation d'événement | à faire | § 3 |
-| S3 — CI/CD GitHub Actions, Azure | à faire | § 3 |
+| **Actualités** (étape 8) — liste et détail publics, accueil, gestion admin avec aperçu | **fait (24/11), à relire** | § 1.11 ; plan [`plan-actualites.md`](plan-actualites.md) ; ADR 0022 et 0023 **acceptés** |
+| Suppression de compte, annulation d'événement | à faire | § 3 |
+| **S3 — CI GitHub Actions** (`ci.yml`, `dependabot.yml`) | **fait (24/11), à valider au premier push** | `exploitation.md` § 10 ; actionlint OK, jamais exécuté sur GitHub ; `-warnaserror` échoue aujourd'hui sur `xUnit2012` (`tests/Aaas.Domain.Tests/News/NewsRulesTests.cs` l. 140) |
+| S3 — CD (`cd.yml`) et Azure | à faire | § 3 |
 | S4 — assistant RAG | à faire | § 3 |
 
 ### 1.1 Front livré (semaine 2)
@@ -282,6 +284,61 @@ Corrections de revue de la tâche B (24/11, points facultatifs 4 à 9) :
 
 Vérifications : Domain **215**, Application **120**, Infrastructure **74**, Intégration **286** (dont `AdminReservationReapplyTests`, 3 tests **déterministes** : un `SaveChangesInterceptor` écrit sur la ligne depuis une autre connexion juste avant l'`UPDATE` de l'admin) ; front **320** tests verts, `lint` OK, `build` OK.
 
+### 1.11 Actualités (étape 8) — 24/11/2026
+
+Plan : [`plan-actualites.md`](plan-actualites.md) (valeurs par défaut P-N1 à P-N7 **acceptées** par le porteur) ; ADR **0022** et **0023** passés à « Accepté (porteur, 24/11/2026) ». Libellés : `libelles-ecrans.md` v1.3 §§ 2, 3, 4, 12 à 14. Règles : `regles-metier.md` § 4 bis, § 5, § 6 ; endpoints : `api.md` « Actualités » ; exploitation : `exploitation.md` § 2 bis (pile `news`) et § 7 (`AddNews`, SQL, curl).
+
+| Tâche | Fait | Fichiers principaux |
+|---|---|---|
+| N1 Domain | `NewsStatus` (1, 2 figés), `NewsFields`, `NewsRules` (normalisation `\r\n` → `\n` + `Trim`, limites 200 / 8 000 comptées après, `Excerpt` : 200 caractères sur une fin de mot, « … », émoji intact, paramètre `moreFollows`), `NewsArticle` (`Create`, `Update`, `Publish` avec `PublishedAt ??= now`, `Unpublish` qui garde la date) ; `ErrorCodes.NewsStateChanged` | `src/Aaas.Domain/News/`, `Common/ErrorCodes.cs` |
+| N2 Infrastructure | `NewsArticleConfiguration` (table `News`, `Content` `nvarchar(max)`, 2 `CHECK`, `IX_News_Status_PublishedAt (Status, PublishedAt, Id)`), `DbSet<NewsArticle> News` ; **migration `AddNews`** (script relu : 1 table, 2 `CHECK`, 1 index, aucune donnée) | `Persistence/Configurations/NewsArticleConfiguration.cs`, `Persistence/Migrations/20261124201130_AddNews.cs` |
+| N3 Application | `PagingQuery` **déplacée** dans `Common/` (abstraite, taille par défaut en paramètre du constructeur), `QueryablePaging.Page<T>` (remplace `EventQueries.Page`), `NotFoundMessages.PublicContent` partagé ; DTO ; `PublicNewsService` (projection `SUBSTRING` de 401 caractères), `AdminNewsService` (`rowversion` sans `IEventLock`, ordre 404 → 409 → 400) | `src/Aaas.Application/Common/`, `src/Aaas.Application/News/` |
+| N4 API | `NewsController` (`/api/news`, anonyme, repli `{id}` → 404), `AdminNewsController` (`/api/admin/news`, `AdminOnly`, repli `MalformedId` → 401/403/404) ; `no-store` par le middleware existant | `src/Aaas.Api/Controllers/` |
+| N5 Tests | voir ci-dessous | `tests/*/News/`, `Support/NewsApiTestBase.cs` |
+| N6 Front public | modèles, `NewsApi`, `toParagraphs`, `<app-news-article>` (interpolation seulement), `/actualites` (10 par page), `/actualites/:id` ; `/` → `/actualites` ; « Actualités » en tête du menu ; logo → `/` ; « Retour à l'accueil » sur « Contenu introuvable » et « Accès réservé » ; **règle ESLint** contre `[innerHTML]`, `innerHTML`, `insertAdjacentHTML`, `document.write`, `bypassSecurityTrust*` | `front/src/app/shared/news/`, `features/public/news-*`, `app.routes.ts`, `layout/`, `front/eslint.config.js` |
+| N7 Front admin | `AdminNewsApi`, `/admin/actualites` (filtre, « Première publication »), `/admin/actualites/nouvelle` et `/:id` (validateur `trimmedText`, compteur compté comme l'API, aide « Texte simple… », aperçu `toSignal(valueChanges)`, flux 409 sur toutes les actions, `news_state_changed` → relecture, suppression confirmée 204/404), sous-menu « Actualités » en premier ; `pile-e2e.sh news` | `front/src/app/features/admin/news/`, `admin.routes.ts`, `admin-layout.ts`, `front/e2e/pile-e2e.sh` |
+| N8 Docs | `api.md`, `regles-metier.md`, `architecture.md` (§ 0, § 1, § 3, § 4 `Content`/`PublishedAt`, index, § 5, § 6, § 13 question 4 tranchée), `exploitation.md`, ce paragraphe ; fiches **`securite-web-xss.md`** (nouvelle), `angular.md` § 19, `ef-core-concurrence.md` § 13 | `docs/` |
+
+Vérifications (24/11/2026) :
+
+| Vérification | Résultat |
+|---|---|
+| `dotnet build` (solution) | OK, **0 avertissement** |
+| `dotnet test tests/Aaas.Domain.Tests -m:1` | **242** verts (27 nouveaux : cycle de vie, republication avec la date d'origine, modification sans toucher la date, texte non encodé, limites 200/201 et 8 000/8 001, 8 000 écrits avec des `\r\n`, extrait : court, espaces, 200 exacts, coupe sur un mot, mot de 300, émoji à cheval, `moreFollows`) |
+| `dotnet test tests/Aaas.Application.Tests -m:1` | **133** verts (13 nouveaux : DTO, version, pas de limite dans le DTO, tailles par défaut 10 / 20, **listes existantes toujours à 20** après le déplacement de `PagingQuery`, bornes) |
+| `dotnet test tests/Aaas.Infrastructure.Tests -m:1` | **78** verts (inchangé) |
+| `dotnet test tests/Aaas.Api.IntegrationTests -m:1` (suite complète, seule sur le Docker) | **348** verts (3 min 17 s), dont **62** actualités : liste triée, 25 → 10/10/5/vide, ordre stable à date égale, vide, 400 de pagination, `SUBSTRING` dans le SQL, détail, **404 identique** (brouillon, dépubliée, inconnue, `abc`, `123`), dépubliée cachée malgré sa date, jeton expiré ignoré, membre, 23:30Z renvoyé en UTC ; création 201 + `Location` + `no-store`, cycle complet avec dates simulées, suppression 204 puis 404, 400 par champ, 8 001 / 8 000 en `\r\n` / titre 201, **XSS renvoyée à l'identique** (base, public, admin), version périmée, 409 avant 400, deux `PUT` concurrents, `news_state_changed`, liste admin et filtre, `CHECK` 547, brouillon daté accepté, **journaux sans titre ni texte** ; accès : 12 routes × visiteur 401 / membre 403 avec `no-store`, 5 routes mal formées admin 404, écritures visiteur sur `/api/news/abc` 401 |
+| `npm run lint` | OK (avec la nouvelle règle anti-`innerHTML`, vérifiée sur un fichier jetable : 3 erreurs attendues) |
+| `npm run test:ci` | **367** tests, 26 fichiers, verts ; couverture totale 90,3 % (lignes 91,6 %) ; nouveaux (`features/news.spec.ts`) : `toParagraphs`, **DOM sans `script`/`img`/`b` pour un texte malveillant** (composant, détail, liste, aperçu), 23:30Z → « 6 décembre 2026 », 404 et id non GUID sans appel, liste vide, page au-delà, pagination, liste admin, formulaire (création + `replaceUrl`, texte blanc refusé, compteur après `Trim`, 400, version remplacée, 409 sur Enregistrer et Publier, Publier grisé si modifié, `news_state_changed`, suppression 204 / 404 / annulée, garde de sortie, aperçu), routes et en-tête |
+| `npm run build` | OK sans avertissement ; bundle initial **429 Ko bruts / 109 Ko transférés** (budget 500 Ko) ; `admin-news-form` chargé à la demande (12,4 Ko) |
+| Pile jetable `pile-e2e.sh up` + `news` + `reservations` + `parcours` + `down` | `news` : **18 `OK`** (dont texte renvoyé à l'identique à travers nginx, `/` servi) ; `reservations` : 13 `OK` ; `parcours` navigateur : 12 `OK`, aucune violation CSP ; pile supprimée. **La pile `docker compose` du porteur n'a pas été touchée** |
+
+Décisions prises pendant la tranche (hors plan, à relire) :
+
+| # | Décision | Pourquoi |
+|---|---|---|
+| T-N1 | Pas de `[MaxLength]` sur le **titre** du DTO non plus (le plan le disait facultatif) | même raison que pour le texte : la longueur est comptée après `Trim` par le Domain (un titre de 200 caractères entouré d'espaces est accepté) ; une seule source |
+| T-N2 | `NewsRules.Excerpt(text, moreFollows)` et projection de **401** caractères (`ExcerptSourceLength + 1`) | sans cela, un texte de plus de 400 caractères dont le début contient beaucoup d'espaces pourrait tenir en 200 une fois réduit et s'afficher **sans** « … » |
+| T-N3 | `PagingQuery` devient **abstraite** (constructeur `protected`) ; constantes `MaxPageSize`, `DefaultPageSize` | aucune instance directe n'existait ; empêche une requête sans taille par défaut explicite |
+| T-N4 | Le 404 public d'une actualité porte `Cache-Control: no-cache,no-store` | posé par l'`ExceptionHandlerMiddleware` d'ASP.NET Core sur toute réponse d'erreur (déjà vrai pour les événements) ; seules les réponses **200** publiques sont sans `no-store` (testé) ; documenté dans `api.md` |
+| T-N5 | Formulaire admin : « Supprimer » **désactivé aussi** tant que le formulaire est modifié | libellés § 13 (UX-7) : Publier, Dépublier, Supprimer |
+| T-N6 | Fiche admin introuvable : « Actualité introuvable. » + « Retour à la liste » (pas la page publique « Contenu introuvable ») | libellés § 13 |
+| T-N7 | Aperçu : formulaire masqué par `[hidden]` (pas `@if`) | la saisie, l'état « modifié » et la garde de sortie restent intacts pendant l'aperçu |
+| T-N8 | `/admin` (sans sous-chemin) redirige toujours vers `/admin/evenements` alors que « Actualités » est en premier dans le sous-menu | moins de changements ; **à trancher** par l'expert-fonctionnel si l'on veut `/admin` → actualités |
+| T-N9 | Règle ESLint étendue à `[srcdoc]`, `outerHTML`, `insertAdjacentHTML`, `document.write` | mêmes puits XSS que `innerHTML` |
+| T-N10 | Compteur du texte formaté par `DecimalPipe` (« 8 000 » avec l'espace fine de la locale `fr`) | cohérent avec le reste de l'interface ; le libellé « 123 / 8 000 » est respecté |
+
+Points pour le `testeur` :
+- intégration : `PUT` sur une actualité **supprimée** entre-temps (404) ; publier pendant un `PUT` concurrent (409 `concurrent_update` attendu côté publier) ; texte de 8 000 caractères **multi-octets** (émojis : `Length` compte les unités UTF-16, comme `nvarchar`) ; `?status=draft` en minuscules (accepté, casse ignorée) ;
+- front : `AdminNewsForm` sur changement de fiche pendant un envoi (`isStale`), « Fermer » du dialogue 409 (saisie conservée + bandeau), dépublier → « Dépublier » remplacé par « Publier » ; `AdminNewsList` : changement de filtre et pagination (`?status=&page=`) par le routeur ; annonce `aria-live` sous 200 caractères restants ; liens du sous-menu admin.
+
+Points pour le `code-reviewer` :
+- recherche `innerHTML|bypassSecurityTrust` dans `front/src` : **aucune occurrence** (règle ESLint active) ;
+- `PagingQuery` déplacée (`Common/`) : `CamelCaseQueryNamesProvider` et `ReservationDtos` ne changent que de `using` ; `EventQueries.Page` supprimée au profit de `QueryablePaging.Page<T>` ;
+- `PublicNewsService.ListAsync` : projection anonyme + `Excerpt` en mémoire ; `PublishedAt!.Value` justifié par `CK_News_PublishedAt` ;
+- `AdminNewsService.TransitionAsync` (délégué `Action<NewsArticle, DateTimeOffset>`) ; `UpdateAsync` : `ConcurrencyGuard` avant la validation ;
+- tests d'intégration : base `NewsApiTestBase` à horloge simulée **immobile** (tri à date égale) ; `PublicNewsTests` active le journal SQL d'EF (`Information`) pour vérifier `SUBSTRING`.
+
 ## 2. Relancer tout depuis un clone neuf
 
 Prérequis : SDK .NET 10 (`global.json`), Docker (Desktop ou Rancher Desktop), Node 24 + npm 11 (pour le front hors Docker), Git Bash sous Windows.
@@ -317,7 +374,7 @@ API_URL=http://localhost:8080 npm start     # arrêter d'abord le conteneur fron
 
 Contrôle de bout en bout sur une pile jetable (ne touche pas à la pile ci-dessus) : `bash front/e2e/pile-e2e.sh up`, puis `parcours`, puis `down` (`exploitation.md` § 2 bis).
 
-**Poste actuel du porteur (24/11)** : la pile `docker compose` tourne, mais ses images datent d'avant la tranche Réservations. `docker compose up -d --build` applique `AddReservations` au démarrage (comptes, événements et numéro conservés) ; vérification SQL : `exploitation.md` § 7. Historique : la pile `docker compose` qui tourne date du 11/11 (image d'API de l'**étape 1**, sans `/api/events`) et n'a pas de service `front`. Pour passer à l'état courant : `docker compose up -d --build` (reconstruit l'API et le front ; la migration `AddEventsAndAssociationSettings` s'applique au démarrage sur la base existante, les comptes sont conservés). Puis saisir le numéro de contact dans « Administration » → « Numéro de contact ».
+**Poste actuel du porteur (24/11)** : `docker compose up -d --build` appliquera aussi `AddNews` (table `News`, rien d'autre ne change ; vérification : `exploitation.md` § 7, « Actualités »). la pile `docker compose` tourne, mais ses images datent d'avant la tranche Réservations. `docker compose up -d --build` applique `AddReservations` au démarrage (comptes, événements et numéro conservés) ; vérification SQL : `exploitation.md` § 7. Historique : la pile `docker compose` qui tourne date du 11/11 (image d'API de l'**étape 1**, sans `/api/events`) et n'a pas de service `front`. Pour passer à l'état courant : `docker compose up -d --build` (reconstruit l'API et le front ; la migration `AddEventsAndAssociationSettings` s'applique au démarrage sur la base existante, les comptes sont conservés). Puis saisir le numéro de contact dans « Administration » → « Numéro de contact ».
 
 ## 3. Ce qui reste à faire (ordre proposé)
 
@@ -329,9 +386,9 @@ Recommandation du plan front (question P-1, défaut accepté par le porteur) : a
 | 2 | ~~**Réservations, tâche A**~~ : **fait le 24/11/2026** (§ 1.5) ; reste : revue `code-reviewer`, passage du `testeur` (§ 1.8), guides utilisateur (`documentaliste`) | — | — | `plan-reservations.md` |
 | 3 | **Réservations, tâches B puis C** (`plan-reservations.md` § 11, B1 à B5, C1 et C2) — **B faite le 24/11/2026** (§ 1.10), C en cours (§ 1.9) : demandes à traiter, confirmer / refuser (motif), annuler (admin), « Payée », inscrits ; tâche d'expiration (`BackgroundService`, seulement s'il y a eu de l'activité) | B1 : `Refuse`, `CancelByAssociation`, `MarkPaid`, `UnmarkPaid` (`Confirm` existe déjà) ; B2 : `IIdentityService.GetContactsAsync`, `AdminReservationService` ; C1 : `ExpireDueAsync`, `ApiActivity`, `ExpirePendingReservationsJob`, sous-section `Reservations:ExpirationJob` | `/admin/demandes`, `/admin/evenements/:id/inscrits`, dialogue de refus, liens « Inscrits » | US-E4 à E7, US-D5, ADR 0005, 0006, 0020, 0021 |
 | 4 | **Annulation d'un événement** (étape 7) et suppression d'un publié sans réservation | transition `Cancelled` | bouton « Annuler l'événement » | US-E3, Q29 |
-| 5 | **Actualités** (étape 8) | entité, CRUD admin, liste publique (10 par page) | `/actualites`, `/actualites/:id`, admin ; `/` redirigera vers les actualités | US-B1, B2, E1 |
+| 5 | ~~**Actualités** (étape 8)~~ : **fait le 24/11/2026** (§ 1.11) ; reste : revue `code-reviewer`, passage du `testeur`, guides (`documentaliste`) | — | — | US-B1, B2, E1 |
 | 6 | **Suppression de compte** | suppression physique, réservations détachées, dernier admin protégé (RG-09) | bouton dans « Mon compte » + confirmation | US-F2, ADR 0007 |
-| 7 | **S3 : CI/CD et Azure** | `ci.yml` (build, tests .NET avec Testcontainers, `npm ci`, `npm run lint`, `npm run test:ci`, `npm run build`, `docker build` des deux images) ; `cd.yml` (GHCR, migration bundle, App Service, Static Web Apps), OIDC, Key Vault, actions « avant production » de `architecture.md` § 9 | `environment.azure.ts` + `fileReplacements`, `staticwebapp.config.json` (repli SPA, mêmes en-têtes de sécurité, `connect-src` élargi à l'URL d'App Service), `Cors:AllowedOrigins` = URL Static Web Apps | `architecture.md` § 10-11, ADR 0017 § 2 |
+| 7 | **S3 : CI/CD et Azure** | ~~`ci.yml`~~ **fait le 24/11/2026, à valider au premier push** (build `-warnaserror`, tests .NET projet par projet avec Testcontainers et artefact TRX, `npm ci`/`lint`/`test:ci`/`build`, `docker build` des deux images sans publication ; `dependabot.yml` ; `exploitation.md` § 10) ; **reste à faire** : `cd.yml` (GHCR, migration bundle, App Service, Static Web Apps), OIDC, Key Vault, actions « avant production » de `architecture.md` § 9 | `environment.azure.ts` + `fileReplacements`, `staticwebapp.config.json` (repli SPA, mêmes en-têtes de sécurité, `connect-src` élargi à l'URL d'App Service), `Cors:AllowedOrigins` = URL Static Web Apps | `architecture.md` § 10-11, ADR 0017 § 2 |
 | 8 | **S4 : assistant RAG** | `POST /api/assistant/questions`, embeddings, index vectoriel (type `VECTOR` d'Azure SQL ou AI Search), ADR à écrire | `features/assistant/` | `architecture.md` § 12 |
 | — | **Documentation utilisateur** | — | guides membre et admin (`docs/guide-utilisateur/`) par le `documentaliste`, à partir de `regles-metier.md` § 6 et `libelles-ecrans.md` | CLAUDE.md |
 
@@ -355,6 +412,6 @@ Recommandation du plan front (question P-1, défaut accepté par le porteur) : a
 - Lire dans l'ordre : `CLAUDE.md`, ce fichier, `docs/cahier-des-charges.md`, `docs/technique/architecture.md` (§ 0, § 6, § 13), puis le plan ou l'ADR de la tâche.
 - Rôles : `expert-fonctionnel` → `architecte` → `expert-technique` → `testeur` → `code-reviewer` → `documentaliste` (CLAUDE.md).
 - Le porteur fait lui-même ses commits (identité `Khalil-B-L`) ; un instantané intermédiaire du front a été committé le 23/11 (`ae6ab12`), le reste du travail de S2 est dans l'arbre de travail, non committé.
-- Fiches de révision à compléter au fil de l'eau : `docs/revision/` (`angular.md`, `docker.md`, `flux-ecran-api-base.md`, `aspnet-identity-jwt.md`, `ef-core-concurrence.md`, `sql-server-verrous-isolation.md`, `dotnet-erreurs-journalisation.md`, `dotnet-background-service.md`).
+- Fiches de révision à compléter au fil de l'eau : `docs/revision/` (`angular.md`, `docker.md`, `flux-ecran-api-base.md`, `aspnet-identity-jwt.md`, `ef-core-concurrence.md`, `sql-server-verrous-isolation.md`, `dotnet-erreurs-journalisation.md`, `dotnet-background-service.md`, `securite-web-xss.md`, `github-actions.md`).
 - **Tâche B faite le 24/11/2026** (§ 1.10) : reste la revue `code-reviewer`, le passage du `testeur` et les guides admin (`documentaliste`). **Tâche C faite le 24/11/2026** (§ 1.9), même suite (revue, testeur). **Prochaine tâche technique** : bloc 4 (annulation d'un événement, `CancelByAssociation` est prêt). Le travail de la tâche A est dans l'arbre de travail, **non committé** (le porteur committe lui-même).
 - Toute modification d'un DTO dans `api.md` se reporte dans `front/src/app/core/models/api-models.ts` ; tout message de validation de l'API dans `front/src/app/shared/forms/validation-messages.ts`.

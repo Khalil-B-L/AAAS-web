@@ -234,6 +234,53 @@ Non modifiables depuis l'interface au MVP. Variables d'environnement : `Reservat
 | Avertissement à la publication | sans numéro configuré, la publication est faite et renvoie `warnings: [{ code: "contact_not_configured", … }]` (non bloquant) | `AdminEventService.PublishAsync`, `SettingsService.IsContactConfiguredAsync` |
 | Journaux (R24) | le numéro n'est jamais journalisé | aucun log dans `SettingsService` |
 
+## 4 bis. Actualités (US-B1, US-B2, US-E1, R18 ; ADR 0022, 0023)
+
+### Statuts (valeurs stockées, figées)
+
+| Valeur | Statut | Vu par le public |
+|---|---|---|
+| 1 | Brouillon (`Draft`) — jamais publiée, ou dépubliée | non (404 « Contenu introuvable. ») |
+| 2 | Publiée (`Published`) | oui |
+
+### Cycle de vie
+
+```mermaid
+stateDiagram-v2
+    [*] --> Brouillon : créer
+    Brouillon --> Publiée : publier (date posée si c'est la première fois)
+    Publiée --> Brouillon : dépublier (date conservée)
+    Brouillon --> Brouillon : modifier
+    Publiée --> Publiée : modifier (date inchangée)
+    Brouillon --> [*] : supprimer
+    Publiée --> [*] : supprimer
+```
+
+### Règles
+
+| Règle | Comportement | Où |
+|---|---|---|
+| Création | toujours en **Brouillon**, sans date de publication | `NewsArticle.Create` (`src/Aaas.Domain/News/`) |
+| Champs (R18) | **titre** obligatoire, 200 caractères au plus ; **texte** obligatoire, **8 000** caractères au plus ; pas d'auteur, pas d'image, pas d'épinglage | `NewsRules.Validate` ; 400 par champ via `AdminNewsService` |
+| Normalisation | titre : espaces de début et de fin retirés ; texte : `\r\n` et `\r` → `\n`, puis espaces de début et de fin retirés. Les longueurs sont comptées **après** (un texte venu de Windows n'est pas pénalisé) | `NewsRules.NormalizeTitle`, `NormalizeContent` |
+| Format | **texte brut** : aucune balise, aucun Markdown, aucune adresse web cliquable ; stocké **tel quel**, sans encodage HTML ; une ligne vide sépare deux paragraphes | ADR 0023 ; front : interpolation seulement |
+| Date de publication | posée à la **première** publication ; **conservée** par la dépublication et par une republication (QN-2) ; jamais changée par une modification ; affichée en **jour de Tunis**, sans l'heure | `NewsArticle.Publish` (`PublishedAt ??= now`) |
+| Publier | seulement un brouillon ; sinon 409 `news_state_changed` « Cette actualité est déjà publiée. » | `NewsArticle.Publish` |
+| Dépublier | seulement une publiée ; sinon 409 `news_state_changed` « Cette actualité n'est pas publiée. » | `NewsArticle.Unpublish` |
+| Modifier | brouillon ou publiée ; une publiée modifiée est visible **tout de suite** ; version obligatoire (409 `concurrent_update` si périmée) | `NewsArticle.Update`, `AdminNewsService.UpdateAsync` |
+| Supprimer | **définitif**, depuis les deux statuts, après confirmation dans le front ; 404 si déjà supprimée | `AdminNewsService.DeleteAsync` |
+| Visibilité publique | **seul le statut compte** (jamais la présence d'une date : une dépubliée garde la sienne). Brouillon, dépubliée, supprimée, inconnue ou identifiant mal formé → **même** 404 « Contenu introuvable. » | `PublicNewsService` ; `NewsController.GetMalformedId` |
+| Liste publique (US-B1) | publiées, la plus récente d'abord (`PublishedAt` décroissante puis `Id`), **10** par page | `PublicNewsService.ListAsync` |
+| Extrait (US-B1) | calculé à chaque lecture (non stocké) : espaces et retours à la ligne réduits à une espace, 200 caractères au plus coupés sur une fin de mot, « … » s'il est coupé ; un mot plus long est coupé net ; jamais un émoji coupé ; seuls les 401 premiers caractères sont lus en base (`SUBSTRING`) | `NewsRules.Excerpt` |
+| Liste admin | toutes, dernière modification d'abord, filtre par statut, 20 par page ; colonne « Première publication » (date conservée même pour un brouillon dépublié) | `AdminNewsService.ListAsync` |
+| Concurrence (ADR 0006, 0022 § 4) | `rowversion` seule, **sans verrou** (aucune règle ne dépend d'autres lignes) ; publier / dépublier / supprimer sans `version`, mais une écriture croisée donne 409 `concurrent_update` | `AdminNewsService`, `ConcurrencyGuard` |
+| Journaux (R24) | titre et texte jamais journalisés (texte libre) | aucun log dans les services ; vérifié par `AdminNewsTests.Logs_do_not_contain_text` |
+| Données personnelles | aucune collectée ni affichée (pas d'auteur) ; ne pas publier de données de membres sans leur accord relève de la responsabilité éditoriale (guide admin) | — |
+
+### Filets en base (table `News`)
+
+`CK_News_Status` (1 ou 2), `CK_News_PublishedAt` (une publiée a toujours une date) ; index `IX_News_Status_PublishedAt (Status, PublishedAt, Id)` pour la liste publique.
+
 ## 5. Codes d'erreur (extension `code` des réponses d'erreur)
 
 | Code | HTTP | Sens |
@@ -264,6 +311,7 @@ Non modifiables depuis l'interface au MVP. Variables d'environnement : `Reservat
 | `cancellation_deadline_passed` | 409 | Annulation d'une réservation confirmée à moins de 24 h du début (RG-05) |
 | `reservation_not_confirmed` | 409 | « Payée » sur une demande encore en attente (« Confirmez d'abord la demande avant de la marquer payée ») ; extension `currentStatus` |
 | `payment_not_applicable` | 409 | « Payée » sur un événement gratuit (« Cet événement est gratuit : aucun paiement à enregistrer ») |
+| `news_state_changed` | 409 | Publier une actualité déjà publiée (« Cette actualité est déjà publiée. »), dépublier un brouillon (« Cette actualité n'est pas publiée. ») : recharger |
 | `contact_not_configured` | — | **Avertissement** (pas une erreur), dans `warnings` de la réponse 200 de publication |
 
 Liste de référence : `src/Aaas.Domain/Common/ErrorCodes.cs` ; noms des extensions : `ErrorDetailKeys` (même fichier). Un code existant ne doit jamais être renommé (le front s'appuie dessus).
@@ -304,3 +352,8 @@ Le serveur reste la seule référence : le front **reprend** certaines règles p
 | Actions admin sur une réservation | boutons de la ligne désactivés pendant l'appel (`busyIds`, un double clic = un appel) ; refus : dialogue « Refuser cette demande ? » (motif facultatif, compteur « n / 500 », saisie bloquée à 500) ; annulation : confirmation (rappel de prévenir la personne, et du remboursement si payée) ; succès : message court ; erreur (409 `reservation_state_changed`, `event_ended`, `payment_not_applicable`…) : message de l'API en bandeau, puis **relecture** de la liste (statut actuel) et du compteur | `admin-reservation-actions.ts`, `refuse-dialog.ts` |
 | Accès admin | menu « Administration » si le jeton porte le rôle `Admin` ; un membre sur `/admin…` voit « Accès réservé » (le code admin n'est pas téléchargé, `canMatch`) | `layout/header.html`, `core/auth/auth.guards.ts` |
 | Quitter un formulaire modifié (UX-8) | confirmation « Quitter sans enregistrer ? » (navigation interne) et alerte du navigateur (fermeture de l'onglet) | `shared/forms/unsaved-changes.guard.ts`, `host` des formulaires admin |
+| Accueil (UX-3) | « / » affiche les actualités (redirection vers `/actualites`) ; « Actualités » est le premier lien du menu et du sous-menu Administration ; le logo mène à « / » ; « Contenu introuvable » et « Accès réservé » proposent « Retour à l'accueil » ; après une connexion, on arrive toujours sur `/evenements` | `app.routes.ts`, `layout/header.html`, `layout/not-found.ts`, `layout/forbidden.ts`, `features/admin/admin-layout.ts` |
+| Actualités : rendu sans HTML (ADR 0023) | titre, extrait et texte affichés **uniquement par interpolation** `{{ }}` : `<script>` ou `<b>` s'affichent comme du texte. Paragraphes découpés sur les lignes vides (`toParagraphs`), un `<p>` chacun, retours à la ligne simples gardés (`white-space: pre-line`). **`[innerHTML]`, `innerHTML`, `bypassSecurityTrust*` interdits dans tout le front** : règle ESLint `no-restricted-syntax` (`npm run lint` échoue) | `shared/news/paragraphs.ts`, `shared/news/news-article.ts`, `front/eslint.config.js` |
+| Actualités : public (US-B1, US-B2) | `/actualites?page=` : cartes (titre en h2, « Publiée le 5 décembre 2026 » en jour de Tunis, extrait, « Lire la suite » + titre pour les lecteurs d'écran), 10 par page, « Aucune actualité pour le moment. », page au-delà de la dernière → message et lien vers la première page ; `/actualites/:id` : même composant `<app-news-article>` que l'aperçu admin, « ← Retour aux actualités » ; 404 ou identifiant non GUID → « Contenu introuvable » sans changer l'adresse (sans appel pour un non-GUID) | `features/public/news-list/`, `features/public/news-detail/` |
+| Actualités : liste admin | `/admin/actualites?status=&page=` : « Titre », « Statut » (« Brouillon » / « Publiée » en toutes lettres), « Première publication » (ou « — »), « Dernière modification » ; filtre « Tous / Brouillons / Publiées » ; « Nouvelle actualité » | `features/admin/news/admin-news-list/` |
+| Actualités : formulaire admin | `/admin/actualites/nouvelle` (déclarée avant `:id`) et `/admin/actualites/:id` ; validateur `trimmedText` : obligatoire et longueur **comptés comme l'API** (après `Trim`, `\r\n` → `\n`), le compteur « 123 / 8 000 » aussi (il ne contredit jamais le message d'erreur) ; compteur annoncé aux lecteurs d'écran seulement sous 200 caractères restants ; aide « Texte simple : … » ; création → fiche (`replaceUrl`) ; « Publier » / « Dépublier » / « Supprimer » désactivés tant que le formulaire est modifié ; « Envoi en cours… » pendant un appel ; `concurrent_update` (enregistrer, publier, dépublier, supprimer) → dialogue « Actualité modifiée par un autre administrateur » / « Recharger » / « Fermer » ; `news_state_changed` → message + relecture ; suppression : confirmation (« Elle n'est plus visible du public dès maintenant. » si publiée), 204 → « L'actualité a été supprimée. », 404 → « Cette actualité a déjà été supprimée. », retour à la liste ; fiche introuvable → « Actualité introuvable. » + « Retour à la liste » ; bascule « Modifier » / « Aperçu » (`aria-pressed`), l'aperçu suit la saisie (`toSignal(form.valueChanges)`), « Brouillon, non publié » sans date | `features/admin/news/admin-news-form/`, `shared/forms/validators.ts` (`trimmedText`) |

@@ -10,6 +10,7 @@ import { PendingCountStore } from './reservations/admin-reservation-actions';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nav class="admin-nav" aria-label="Administration">
+      <a mat-button routerLink="actualites" routerLinkActive="active">Actualités</a>
       <a mat-button routerLink="evenements" routerLinkActive="active">Événements</a>
       <a mat-button routerLink="demandes" routerLinkActive="active">{{ requestsLabel() }}</a>
       <a mat-button routerLink="parametres" routerLinkActive="active">Numéro de contact</a>

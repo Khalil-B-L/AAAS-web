@@ -11,7 +11,7 @@ import { RouterLink } from '@angular/router';
     <section class="page">
       <h1>Accès réservé</h1>
       <p>Cette page est réservée aux administrateurs.</p>
-      <a mat-flat-button routerLink="/evenements">Retour aux événements</a>
+      <a mat-flat-button routerLink="/">Retour à l'accueil</a>
     </section>
   `,
 })

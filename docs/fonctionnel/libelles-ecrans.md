@@ -1,8 +1,8 @@
-# Libellés français des écrans — semaines 2 et réservations
+# Libellés français des écrans — semaines 2, réservations et actualités
 
-Version 1.2 — 24/11/2026 (voir l'historique en fin de document). Interface en français uniquement. Tutoiement exclu : on **vous** vouvoie. Les textes entre guillemets sont à utiliser tels quels. Les messages de validation (champs) reprennent ceux de l'API (`docs/technique/api.md`) et ne sont pas répétés ici.
+Version 1.3 — 24/11/2026 (voir l'historique en fin de document). Interface en français uniquement. Tutoiement exclu : on **vous** vouvoie. Les textes entre guillemets sont à utiliser tels quels. Les messages de validation (champs) reprennent ceux de l'API (`docs/technique/api.md`) et ne sont pas répétés ici.
 
-Format des dates : détail « samedi 5 décembre 2026 à 10:00 », listes « sam. 5 déc. 2026, 10:00 » (heure de Tunis).
+Format des dates : détail « samedi 5 décembre 2026 à 10:00 », listes « sam. 5 déc. 2026, 10:00 » (heure de Tunis). **Actualités** : la date de publication s'affiche **sans l'heure**, « 5 décembre 2026 » (jour de Tunis, donc une publication à 23:30 UTC le 5 s'affiche le 6).
 
 ## 1. Général
 
@@ -22,13 +22,15 @@ Format des dates : détail « samedi 5 décembre 2026 à 10:00 », listes « sam
 
 | Élément | Visiteur | Membre | Administrateur |
 |---|---|---|---|
-| Liens | « Événements », « Se connecter », « Créer un compte » | « Événements », « Mes réservations », « Mon compte », « Se déconnecter » | idem membre + « Administration » |
+| Liens | « Actualités », « Événements », « Se connecter », « Créer un compte » | « Actualités », « Événements », « Mes réservations », « Mon compte », « Se déconnecter » | idem membre + « Administration » |
 | Accueil du menu | « Bonjour {prénom} » (connecté) | | |
 | Menu mobile | bouton « Menu » (ouvrir), « Fermer le menu » | | |
 
+« Actualités » est le **premier** lien du menu. Le logo / nom du site mène à l'accueil « / », qui affiche la page « Actualités » (le chemin « /actualites » fonctionne aussi). Après une connexion, on arrive sur « Événements » (inchangé).
+
 Pied de page : « Politique de confidentialité », « © [année] [NOM DE L'ASSOCIATION] ».
 
-Sous-menu Administration : « Événements », « Demandes (N) » (N = nombre de demandes en attente ; « Demandes » seul s'il n'y en a aucune), « Numéro de contact ».
+Sous-menu Administration : « Actualités », « Événements », « Demandes (N) » (N = nombre de demandes en attente ; « Demandes » seul s'il n'y en a aucune), « Numéro de contact ». « Actualités » est placé **en premier** (valeur par défaut QN-8, alignée sur le menu public).
 
 ## 3. Événements (public)
 
@@ -46,7 +48,7 @@ Sous-menu Administration : « Événements », « Demandes (N) » (N = nombre de
 | Bouton membre | « Demander une place » (UX-9 levé : voir § 8) |
 | Événement annulé | bandeau « Cet événement a été annulé. » |
 | Événement terminé | bandeau « Cet événement est terminé. » |
-| Événement introuvable | titre « Contenu introuvable » ; texte « Cette page n'existe pas ou n'est plus disponible. » ; lien « Retour aux événements » |
+| Événement introuvable | titre « Contenu introuvable » ; texte « Cette page n'existe pas ou n'est plus disponible. » ; lien « Retour à l'accueil » (v1.3 : page commune à tout le site, voir § 12 ; remplace « Retour aux événements ») |
 
 ## 4. Compte
 
@@ -59,7 +61,7 @@ Sous-menu Administration : « Événements », « Demandes (N) » (N = nombre de
 | Compte verrouillé | « Trop de tentatives. Votre compte est bloqué temporairement. Réessayez plus tard. » |
 | Session expirée | « Votre session a expiré. Veuillez vous reconnecter. » |
 | Mon compte | Titre « Mon compte » ; « Prénom », « Nom », « Adresse e-mail », « Téléphone », « Compte créé le … » ; lien « Voir mes réservations » (vers « Mes réservations », US-F3) ; pas de bouton de suppression pour l'instant (US-F2 plus tard) |
-| Accès réservé | Titre « Accès réservé » ; texte « Cette page est réservée aux administrateurs. » ; lien « Retour aux événements » |
+| Accès réservé | Titre « Accès réservé » ; texte « Cette page est réservée aux administrateurs. » ; lien « Retour à l'accueil » (v1.3 : remplace « Retour aux événements ») |
 
 ## 5. Administration (événements et numéro de contact)
 
@@ -94,7 +96,7 @@ Titre « Politique de confidentialité » ; contenu : `docs/fonctionnel/politiqu
 |---|---|
 | 403 (droits insuffisants) | « Vous n'avez pas le droit d'effectuer cette action. » |
 | 404 | « Contenu introuvable. » |
-| 409 (conflit) | voir « Conflit entre admins » pour les événements, et le § 11 pour les réservations |
+| 409 (conflit) | voir « Conflit entre admins » pour les événements, le § 11 pour les réservations et le § 14 pour les actualités |
 | 5xx / inattendu | « Un problème est survenu. Veuillez réessayer plus tard. » |
 
 ## 8. Réservation : panneau « Ma réservation » sur le détail d'un événement
@@ -199,12 +201,68 @@ Côté administration (§ 10), les statuts s'écrivent « En attente », « Conf
 | 404 (réservation inconnue ou d'un autre membre ; événement brouillon) | tous | « Contenu introuvable. » |
 | 401 | tous | « Votre session a expiré. Veuillez vous reconnecter. » |
 
-## 12. Hors périmètre de ce document (pour mémoire)
+## 12. Actualités (public)
 
-Annulation d'un événement par l'admin (US-E3), actualités, suppression de compte : libellés à définir avec l'étape correspondante.
+Page « Contenu introuvable » **commune à tout le site** (actualité, événement, adresse inconnue) : titre « Contenu introuvable » ; texte « Cette page n'existe pas ou n'est plus disponible. » ; lien « Retour à l'accueil » (mène à « / », donc aux actualités). Elle s'affiche **sans changer l'adresse** de la barre du navigateur. Elle est identique pour une actualité en brouillon, dépubliée, supprimée, inexistante ou dont l'identifiant est mal formé.
+
+| Élément | Libellé |
+|---|---|
+| Titre d'onglet et de page | « Actualités » |
+| Carte d'actualité (liste) | titre (niveau de titre 2), « Publiée le 5 décembre 2026 », extrait (200 caractères au plus, terminé par « … » s'il est coupé), lien « Lire la suite » (le lecteur d'écran lit « Lire la suite : {titre} ») |
+| Message vide | « Aucune actualité pour le moment. » |
+| Pagination | celle du § 1 (« Précédent », « Suivant », « Page 2 sur 5 »), 10 actualités par page |
+| Détail | titre de l'actualité (niveau de titre 1), « Publiée le 5 décembre 2026 », texte complet (un paragraphe par bloc séparé d'une ligne vide) ; lien « ← Retour aux actualités » |
+| Contenu saisi | affiché **tel quel** : `<script>` ou `<b>` s'affichent comme du texte ; aucune adresse web cliquable ; ni auteur, ni image, ni « Mise à jour le » |
+| Actualité introuvable | la page « Contenu introuvable » ci-dessus |
+
+## 13. Actualités (administration)
+
+| Élément | Libellé |
+|---|---|
+| Titre liste | « Administration — actualités » |
+| Bouton | « Nouvelle actualité » |
+| Filtre | « Statut » : « Tous », « Brouillons », « Publiées » (par défaut « Tous ») |
+| Colonnes | « Titre », « Statut », « Première publication » (date, ou « — » si jamais publiée), « Dernière modification » (format des listes) ; tri : dernière modification d'abord ; 20 par page |
+| Statuts | « Brouillon », « Publiée » (texte, pas seulement une couleur) |
+| Message vide | « Aucune actualité ne correspond à ce filtre. » |
+| Formulaire : titres | « Nouvelle actualité », « Modifier l'actualité » |
+| Champs | « Titre », « Texte » ; aide du texte : « Texte simple : la mise en forme et les adresses web ne sont pas interprétées. Une ligne vide sépare deux paragraphes. » ; compteur « 123 / 8 000 » (titre : « 12 / 200 ») |
+| Boutons | « Enregistrer », « Publier », « Dépublier », « Supprimer », « Annuler » (« Publier » sur un brouillon, « Dépublier » sur une publiée ; « Supprimer » absent d'une nouvelle actualité) |
+| Aperçu | bascule « Modifier » / « Aperçu » ; l'aperçu montre le rendu public (titre, date, texte) et suit la saisie ; sans date de publication : « Brouillon, non publié » à la place de la date |
+| Enregistré | « Enregistré. » |
+| Publié | « L'actualité est publiée. » |
+| Dépublié | « L'actualité n'est plus publiée. » |
+| Boutons grisés (UX-7) | Publier, Dépublier, Supprimer désactivés avec l'aide « Enregistrez d'abord vos modifications. » ; tous les boutons sont désactivés pendant un envoi (« Envoi en cours… ») |
+| Suppression : confirmation | Titre « Supprimer définitivement cette actualité ? » ; texte « Cette action est définitive. » ; si publiée, ajouter « Elle n'est plus visible du public dès maintenant. » ; boutons « Supprimer » / « Annuler » |
+| Après suppression | « L'actualité a été supprimée. » puis retour à la liste |
+| Déjà supprimée par un autre admin | « Cette actualité a déjà été supprimée. » puis retour à la liste |
+| Fiche introuvable (adresse admin) | « Actualité introuvable. » + lien « Retour à la liste » |
+| Quitter un formulaire modifié | celui du § 1 (UX-8) |
+| Messages de validation | repris de l'API (titre ou texte obligatoire, 200 / 8 000 caractères au plus) : non répétés ici |
+
+## 14. Messages d'erreur par code (actualités)
+
+Mêmes principes qu'au § 11 côté administration : le message s'affiche dans la page, puis la fiche (ou la liste) est relue avec l'état actuel.
+
+| Code | Où | Message |
+|---|---|---|
+| `news_state_changed` | « Publier » sur une actualité déjà publiée | « Cette actualité est déjà publiée. » puis la fiche est relue (proposition ; doit correspondre au texte du Domain, voir les remarques de la v1.3) |
+| `news_state_changed` | « Dépublier » sur une actualité qui n'est pas publiée | « Cette actualité n'est pas publiée. » puis la fiche est relue (proposition, idem) |
+| `concurrent_update` | « Enregistrer » (modification) | Dialogue : titre « Actualité modifiée par un autre administrateur » ; texte « Cette actualité vient d'être modifiée. Rechargez la page pour voir la dernière version. Vos modifications seront perdues. » ; boutons « Recharger » / « Fermer » (Fermer permet de recopier sa saisie) ; même fonctionnement que pour les événements (§ 5) |
+| `concurrent_update` | « Publier », « Dépublier », « Supprimer » | même dialogue que ci-dessus (proposition : le plan ne prévoit pas de libellé distinct) |
+| 400 (champs) | « Enregistrer » | messages de l'API recopiés sous le champ concerné |
+| 404 | fiche admin, publier, dépublier | « Actualité introuvable. » |
+| 404 | « Supprimer » | « Cette actualité a déjà été supprimée. » puis retour à la liste |
+| 404 | pages publiques | page « Contenu introuvable » (§ 12) |
+| 401 / 403 | écrans admin | § 7 (« Votre session a expiré. » / « Vous n'avez pas le droit d'effectuer cette action. ») ; un membre qui ouvre une page admin voit « Accès réservé » (§ 4) |
+
+## 15. Hors périmètre de ce document (pour mémoire)
+
+Annulation d'un événement par l'admin (US-E3) et suppression de compte : libellés à définir avec l'étape correspondante.
 
 ## Historique
 
+- **1.3 (24/11/2026)** : actualités. § 2 : lien « Actualités » en premier dans le menu public et dans le sous-menu Administration, logo vers l'accueil (qui affiche les actualités). § 3 et § 4 : le lien de « Contenu introuvable » et d'« Accès réservé » devient « Retour à l'accueil » (page commune, plan actualités § 7.2). § 7 : renvoi vers le § 14. Nouveaux § 12 (actualités, public), § 13 (actualités, administration), § 14 (messages d'erreur par code) ; l'ancien § 12 « Hors périmètre » devient § 15 et ne mentionne plus les actualités.
 - **1.2 (24/11/2026)** : § 10 complété avec ce qui est déjà à l'écran (T-B9, T-B11) : lien « WhatsApp » pour tous les inscrits (libellé neutre), aide du dialogue de refus « Ne mettez pas de données personnelles dans le motif. », colonne « Statut » et « Motif : … » dans « Autres », colonne « Paiement » aussi dans « Autres ». Forme retenue pour un admin supprimé : « Payée le {date} par un administrateur supprimé ». § 11 : côté administration, erreurs en bandeau de page puis liste relue (T-B10), au lieu de « près du bouton ».
 - **1.1 (24/11/2026)** : réservations (§ 8 à 11).
 - **1.0 (23/11/2026)** : semaine 2.

@@ -13,13 +13,14 @@
 | 4. Réservations, tâche A (demander, suivre, annuler) | **Implémentée** (24/11/2026), revue à faire | plan [`plan-reservations.md`](plan-reservations.md), ADR 0018 à 0021 ; migration `AddReservations` ; `MemberReservationService`, `EventOccupancyReader` réel, `/api/me/...`, panneau « Ma réservation », `/mes-reservations` |
 | 4-5. Réservations, tâche B (traitement admin) | **Implémentée** (24/11/2026), revue à faire | `Reservation.Refuse`, `CancelByAssociation`, `MarkPaid`, `UnmarkPaid`, `AdminActions` ; `AdminReservationService` (sans verrou d'événement, `rowversion`, une requête de coordonnées par écran via `IIdentityService.GetContactsAsync`) ; `AdminReservationsController` (`/api/admin/reservations/...`, `/api/admin/events/{id}/reservations`) ; front `/admin/demandes`, `/admin/evenements/:id/inscrits`, dialogue de refus, compteur « Demandes (N) » |
 | 5. Réservations, tâche C (expiration périodique) | à faire | même plan |
-| 6 à 9 | à faire | — |
+| 8. Actualités | **Implémentée** (24/11/2026), revue à faire | plan [`plan-actualites.md`](plan-actualites.md), ADR 0022 et 0023 ; migration `AddNews` ; `PublicNewsService`, `AdminNewsService`, `/api/news`, `/api/admin/news` ; front `/actualites`, `/actualites/:id`, `/admin/actualites` (aperçu, flux 409) ; accueil `/` → actualités |
+| 6, 7, 9 | à faire | — |
 
 Dans ce document, ce qui n'existe pas encore est signalé par *(étape N)* ou *(S3)*.
 
 ## 1. Décisions d'architecture (index)
 
-Les ADR 0001 à 0003 et 0007 à 0013 sont au statut **Proposé** : le porteur n'a pas encore validé formellement ces choix (voir § 13). Les ADR 0014 à 0017 (front) sont **acceptés** (porteur, 23/11/2026) ; les ADR 0004, 0005, 0006 et 0018 à 0021 (réservations) sont **acceptés** (porteur, 24/11/2026).
+Les ADR 0001 à 0003 et 0007 à 0013 sont au statut **Proposé** : le porteur n'a pas encore validé formellement ces choix (voir § 13). Les ADR 0014 à 0017 (front) sont **acceptés** (porteur, 23/11/2026) ; les ADR 0004, 0005, 0006 et 0018 à 0021 (réservations) puis 0022 et 0023 (actualités) sont **acceptés** (porteur, 24/11/2026).
 
 | ADR | Décision en une ligne |
 |---|---|
@@ -44,6 +45,8 @@ Les ADR 0001 à 0003 et 0007 à 0013 sont au statut **Proposé** : le porteur n'
 | [0019](../adr/0019-reservation-concurrence-idempotence-et-double-clic.md) | Demande de place sous `UPDLOCK` (heure lue après le verrou), transitions par `rowversion`, violation d'index traduite sans `SqlClient` dans Application, pas d'`Idempotency-Key` (409 `already_reserved` + `reservationId`) (**accepté**) |
 | [0020](../adr/0020-tache-d-expiration-backgroundservice.md) | Tâche d'expiration `BackgroundService` + `PeriodicTimer` (5 min), idempotente, seulement s'il y a eu de l'activité (Azure SQL serverless) — tâche C (**accepté**) |
 | [0021](../adr/0021-reservations-routes-et-donnees-des-inscrits.md) | Routes `/api/me` (identité du jeton) et `/api/admin`, « ma demande » par un appel séparé (204), coordonnées des inscrits pour l'admin seulement, `Cache-Control: no-store`, rien dans les journaux (**accepté**) |
+| [0022](../adr/0022-actualites-modele-cycle-de-vie-et-date-de-publication.md) | Actualité : entité `NewsArticle` (table `News`), 2 statuts figés, `PublishedAt` posée à la première publication et conservée, statut seule source de visibilité, `rowversion` sans verrou, actions sans `version`, suppression permise depuis les deux statuts, `news_state_changed` (**accepté**) |
+| [0023](../adr/0023-contenu-des-actualites-texte-brut-rendu-sans-html-et-extrait.md) | Contenu : texte brut stocké sans encodage, rendu Angular par interpolation seulement (aucun `innerHTML`, règle ESLint), paragraphes par `toParagraphs`, limites 200 / 8 000 après normalisation, extrait de 200 caractères calculé (projection `SUBSTRING`) (**accepté**) |
 
 ## 2. Vue d'ensemble
 
@@ -85,17 +88,18 @@ AAAS/
 │  │  ├─ Common/                   PhoneNumber, BusinessRuleException, ErrorCodes, Roles ; FieldError (étape 2)
 │  │  ├─ Events/                   Event, EventStatus, EventDetails, EventOccupancy, EventRules, EventFields (étape 2)
 │  │  ├─ Reservations/             Reservation, ReservationStatus, règles de transition (étape 4)
-│  │  ├─ News/                     News, NewsStatus (étape 8)
+│  │  ├─ News/                     NewsArticle, NewsStatus, NewsRules (limites, normalisation, extrait), NewsFields (étape 8)
 │  │  └─ Settings/                 AssociationSettings (étape 2)
 │  ├─ Aaas.Application/            dépend de Domain (+ EF Core à partir de l'étape 2)
 │  │  ├─ Accounts/                 AccountService, DTO, Validation/ (attributs), IIdentityService, ITokenService
 │  │  ├─ Common/Errors/            RequestValidationException, AuthenticationFailedException, NotFoundException ; ConcurrencyGuard (étape 2)
-│  │  ├─ Common/                   PagedResult<T>, RowVersions, FieldErrors ; Validation/ ([TunisianPhoneNumber] déplacé, [DateTimeWithOffset], [RowVersion]) (étape 2)
+│  │  ├─ Common/                   PagedResult<T>, PagingQuery (taille par défaut paramétrée), QueryablePaging.Page<T>, RowVersions, FieldErrors ; Validation/ ([TunisianPhoneNumber] déplacé, [DateTimeWithOffset], [RowVersion]) (étape 2)
 │  │  ├─ Options/                  BootstrapOptions, PrivacyPolicyOptions ; ReservationOptions (étape 4)
 │  │  ├─ Abstractions/             IAppDbContext, IEventLock (étape 2)
 │  │  ├─ Events/                   AdminEventService, PublicEventService, EventOccupancyReader, EventQueries, DTO (étape 2)
 │  │  ├─ Settings/                 SettingsService, DTO (étape 2)
-│  │  └─ Reservations/ News/       (étapes suivantes)
+│  │  ├─ Reservations/             MemberReservationService, AdminReservationService, ReservationExpiryService (étape 4)
+│  │  └─ News/                     PublicNewsService, AdminNewsService, DTO (étape 8)
 │  ├─ Aaas.Infrastructure/
 │  │  ├─ Persistence/              AppDbContext (implémente IAppDbContext), Configurations/, Conventions/ (UTC), Migrations/,
 │  │  │                            SqlServerErrors (numéros SQL) ; EventLock (UPDLOCK, étape 2)
@@ -214,9 +218,9 @@ erDiagram
     News {
         uniqueidentifier Id PK
         nvarchar200 Title
-        nvarcharmax Body
-        tinyint Status "1 Brouillon, 2 Publiée"
-        datetimeoffset FirstPublishedAt
+        nvarcharmax Content "texte brut, 8 000 au plus après normalisation"
+        tinyint Status "CHECK 1 Brouillon, 2 Publiée"
+        datetimeoffset PublishedAt "première publication, conservée ; CHECK Status = 1 OR PublishedAt IS NOT NULL"
         datetimeoffset CreatedAt
         datetimeoffset UpdatedAt
         rowversion RowVersion
@@ -230,13 +234,13 @@ erDiagram
     }
 ```
 
-À l'étape 1, seule la partie Identity (`AspNetUsers`, `AspNetRoles`, `AspNetUserRoles` et les autres tables Identity) existe (migration `InitialIdentity`). L'étape 2 ajoute `Events` et `AssociationSettings` (migration `AddEventsAndAssociationSettings`, avec l'insertion de la ligne `Id = 1` des paramètres) ; `Events.CancelledAt` arrive à l'étape 7. La tranche Réservations ajoute `Reservations` (migration `AddReservations`, 24/11/2026 : trois clés étrangères `NO ACTION`, quatre `CHECK` dont `CK_Reservations_Paid` et `CK_Reservations_PaidAt`, pas de `DecidedByAdminId` ni d'`ExpiredAt`). `News` (étape 8) est la cible d'une étape suivante.
+À l'étape 1, seule la partie Identity (`AspNetUsers`, `AspNetRoles`, `AspNetUserRoles` et les autres tables Identity) existe (migration `InitialIdentity`). L'étape 2 ajoute `Events` et `AssociationSettings` (migration `AddEventsAndAssociationSettings`, avec l'insertion de la ligne `Id = 1` des paramètres) ; `Events.CancelledAt` arrive à l'étape 7. La tranche Réservations ajoute `Reservations` (migration `AddReservations`, 24/11/2026 : trois clés étrangères `NO ACTION`, quatre `CHECK` dont `CK_Reservations_Paid` et `CK_Reservations_PaidAt`, pas de `DecidedByAdminId` ni d'`ExpiredAt`). La tranche Actualités (étape 8) ajoute `News` (migration `AddNews`, 24/11/2026 : entité `NewsArticle`, `Content nvarchar(max)`, `PublishedAt` posée à la première publication et conservée, `CK_News_Status`, `CK_News_PublishedAt`, ADR 0022).
 
 Précisions :
 - **Compte (R20, cahier § 6.4)** : exactement prénom, nom, e-mail, téléphone, mot de passe haché, date de création, date de dernière connexion, consentement (date + version). **Aucune donnée d'âge** (décision du porteur : pas de contrôle de majorité). `LastLoginAt` est initialisée à l'inscription (qui connecte l'utilisateur) puis mise à jour à chaque connexion **réussie** ; un échec ne la modifie pas. Le téléphone **n'est pas unique** : deux comptes peuvent partager un numéro (décision par défaut, ADR 0002).
 - **Version de la politique** : `PrivacyPolicyVersion` reçoit `PrivacyPolicy:CurrentVersion` (configuration, « 1.0 »), jamais une valeur envoyée par le client. Redemander l'accord quand la politique change n'est pas au MVP (Q16) ; la colonne permet de le faire plus tard sans migration de données.
 - **Statuts de réservation** (`tinyint`, valeurs figées car utilisées dans un index filtré) : 1 En attente, 2 Confirmée, 3 Refusée, 4 Expirée, 5 Annulée par l'utilisateur, 6 Annulée par l'association. Statut « Terminé » d'un événement : **calculé** (`EndsAt <= now`), jamais stocké.
-- **Index** : `UX_AspNetUsers_NormalizedEmail` unique filtré `IS NOT NULL` (remplace l'index non unique `EmailIndex` d'Identity) ; `UserNameIndex` (Identity, unique filtré) ; puis `UX_Reservations_Event_User_Active (EventId, UserId) WHERE Status IN (1,2) AND UserId IS NOT NULL` (RG-03) ; `IX_Reservations_EventId_Status (EventId, Status) INCLUDE (ExpiresAt)` (décompte couvert par l'index) ; `IX_Reservations_UserId`, `IX_Reservations_PaidByAdminId` (clés étrangères) ; `IX_Reservations_Status_ExpiresAt` (expiration, liste admin) ; `IX_Events_Status_StartsAt` (listes publique et admin : filtre par statut et tri ; le filtre `EndsAt > now` est résiduel, sans conséquence au volume attendu, ADR 0011) ; `IX_News_Status_FirstPublishedAt`.
+- **Index** : `UX_AspNetUsers_NormalizedEmail` unique filtré `IS NOT NULL` (remplace l'index non unique `EmailIndex` d'Identity) ; `UserNameIndex` (Identity, unique filtré) ; puis `UX_Reservations_Event_User_Active (EventId, UserId) WHERE Status IN (1,2) AND UserId IS NOT NULL` (RG-03) ; `IX_Reservations_EventId_Status (EventId, Status) INCLUDE (ExpiresAt)` (décompte couvert par l'index) ; `IX_Reservations_UserId`, `IX_Reservations_PaidByAdminId` (clés étrangères) ; `IX_Reservations_Status_ExpiresAt` (expiration, liste admin) ; `IX_Events_Status_StartsAt` (listes publique et admin : filtre par statut et tri ; le filtre `EndsAt > now` est résiduel, sans conséquence au volume attendu, ADR 0011) ; `IX_News_Status_PublishedAt (Status, PublishedAt, Id)` (liste publique : filtre par statut, tri par date décroissante puis `Id`, index lu à l'envers).
 - **Index filtrés et `QUOTED_IDENTIFIER`** : SQL Server refuse toute écriture dans une table qui a un index filtré si la session a `QUOTED_IDENTIFIER OFF` (erreur 1934). EF Core et SSMS sont à `ON` ; `sqlcmd` ne l'est qu'avec l'option **`-I`**, obligatoire pour les scripts manuels (`exploitation.md` § 6).
 - **Contraintes** : `CK_Events_Dates (EndsAt > StartsAt)`, `CK_Events_Capacity (Capacity >= 1)`, `CK_Events_Price (Price IS NULL OR Price > 0)`, `CK_Events_Status (Status IN (1, 2, 3))`, `CK_AssociationSettings_Singleton (Id = 1)`. Ce sont des filets : les règles sont d'abord vérifiées par le Domain. Clés étrangères `Reservations → Events` en `NO ACTION` (un événement ayant eu des réservations ne se supprime pas, RG-07) ; `Reservations → AspNetUsers` (deux FK) en `NO ACTION`, détachement fait par l'application (ADR 0007).
 - **Montants** : `decimal(9,3)` (millimes ; 5 octets, contre 9 pour une précision ≥ 10), propriété `decimal? Price` du Domain, **sans objet `Money`** (une seule devise, aucun calcul) ; « 0 » est normalisé en `NULL` (gratuit) ; plus de 3 décimales → refus, pas d'arrondi (ADR 0010).
@@ -259,6 +263,7 @@ Précisions :
 - Endpoints de l'étape 1 (détail dans `docs/technique/api.md`, tenu par l'expert technique) : `POST /api/auth/register` (201), `POST /api/auth/login` (200), `GET /api/account/me` (authentifié). Les réponses de compte exposent **`roles` en tableau** (`["User"]`, ou `["Admin", "User"]` pour un admin). Documentation interactive : OpenAPI intégré à ASP.NET Core (`/openapi/v1.json`), exposé en développement uniquement.
 - **Réservations du membre** (tâche A, réalisée) : `POST /api/me/reservations` (201), `GET /api/me/reservations?scope=current|history`, `GET /api/me/reservations/{id}`, `GET /api/me/events/{eventId}/reservation` (200 ou **204**), `POST /api/me/reservations/{id}/cancel`. Identité tirée du jeton ; réservation d'un autre membre → 404. Les 409 de réservation portent des extensions (`reservationId`, `currentStatus`). Toutes les réponses de `/api/me` et `/api/admin` (erreurs comprises) portent `Cache-Control: no-store` (middleware `NoStoreMiddleware`, posé avant `UseExceptionHandler`). Détail : `api.md`.
 - **Réservations côté admin** (tâche B, réalisée ; `AdminOnly`) : `GET /api/admin/reservations/pending` (paginée, échéance croissante), `GET /api/admin/events/{eventId}/reservations` (non paginée : `pending`, `confirmed`, `others`, `occupancy`), `POST /api/admin/reservations/{id}/confirm | refuse ({ reason? }) | cancel | mark-paid | unmark-paid`. Actions sans `version` ni verrou d'événement : la `rowversion` de la réservation donne 409 `reservation_state_changed` + `currentStatus` ; réapplication unique si le statut n'a pas changé. Identifiant mal formé : 404 admin, 403 membre, 401 visiteur. Coordonnées des membres : une requête par écran (`IIdentityService.GetContactsAsync`). Détail : `api.md`.
+- **Actualités** (étape 8, réalisée) : `GET /api/news` (anonyme, publiées, 10 par page, `excerpt`), `GET /api/news/{id}` (anonyme, 404 identique pour brouillon, dépubliée, inconnue, mal formée), `/api/admin/news` (`AdminOnly`, `no-store` : liste, fiche, `POST` 201, `PUT` avec `version`, `POST .../publish|unpublish`, `DELETE` 204) ; détail dans `api.md`.
 - Endpoints de l'étape 2 *(conçus, plan `plan-etape-2.md` § 6)* :
 
   | Verbe et route | Accès | Réponse | Erreurs propres |
@@ -331,16 +336,17 @@ Routes (en français, chaque page chargée à la demande) :
 
 | Chemin | Écran | Accès |
 |---|---|---|
-| `/` | redirection vers `/evenements` (pas encore d'actualités) | tous |
+| `/` | redirection vers `/actualites` (UX-3, `pathMatch: 'full'`) | tous |
+| `/actualites`, `/actualites/:id` | actualités publiées (`?page=`, 10 par page), détail (`<app-news-article>`, texte brut) | tous |
 | `/evenements`, `/evenements/:id` | liste (`?page=`), détail | tous |
 | `/inscription`, `/connexion` | formulaires (`?returnUrl=`, `?raison=expiree`) | visiteur (`guestGuard`) |
 | `/mon-compte` | lecture du compte, lien vers « Mes réservations » | connecté (`authGuard`) |
 | `/mes-reservations` | « À venir » et « Historique », annulation, carte de contact | connecté (`authGuard`) |
 | `/confidentialite` | politique (texte provisoire) | tous |
 | `/acces-refuse`, `**` | accès réservé, contenu introuvable | tous |
-| `/admin/evenements`, `/admin/evenements/nouveau`, `/admin/evenements/:id`, `/admin/evenements/:id/inscrits` (déclarée avant `:id`), `/admin/demandes`, `/admin/parametres` | espace admin chargé par `loadChildren` ; sous-menu « Événements », « Demandes (N) », « Numéro de contact » | admin (`adminGuard` en `canMatch`) ; garde de sortie sur les formulaires |
+| `/admin/evenements`, `/admin/evenements/nouveau`, `/admin/evenements/:id`, `/admin/evenements/:id/inscrits` (déclarée avant `:id`), `/admin/demandes`, `/admin/parametres`, `/admin/actualites`, `/admin/actualites/nouvelle` (déclarée avant `:id`), `/admin/actualites/:id` | espace admin chargé par `loadChildren` ; sous-menu « Actualités », « Événements », « Demandes (N) », « Numéro de contact » | admin (`adminGuard` en `canMatch`) ; garde de sortie sur les formulaires |
 
-Le détail `/evenements/:id` contient le panneau `<app-reservation-panel>` (composant enfant : `input()` de l'événement, `output()` pour recharger les places) ; le numéro de contact est lu une fois par session par `ContactStore`. Côté admin (tâche B) : `features/admin/reservations/` (pages « Demandes à traiter » et « Inscrits », `AdminReservationActions` partagé, `RefuseDialog`, `PendingCountStore` pour le compteur du menu) ; les coordonnées des inscrits ne vivent que dans les signaux des pages. Plus tard : `/actualites`, `/actualites/:id`.
+Le détail `/evenements/:id` contient le panneau `<app-reservation-panel>` (composant enfant : `input()` de l'événement, `output()` pour recharger les places) ; le numéro de contact est lu une fois par session par `ContactStore`. Côté admin (tâche B) : `features/admin/reservations/` (pages « Demandes à traiter » et « Inscrits », `AdminReservationActions` partagé, `RefuseDialog`, `PendingCountStore` pour le compteur du menu) ; les coordonnées des inscrits ne vivent que dans les signaux des pages. Actualités (étape 8) : `shared/news/` (`toParagraphs`, `<app-news-article>` partagé par le détail public et l'aperçu admin), `features/public/news-*`, `features/admin/news/` ; **aucun `[innerHTML]` ni `bypassSecurityTrust*`** (règle ESLint, ADR 0023).
 
 Session (ADR 0015) : au démarrage, `AuthService` relit `localStorage` `aaas.session = { accessToken, localDeadline }` et décode le JWT (prénom, rôles) **sans appel réseau** : les pages publiques ne dépendent jamais de l'API d'authentification. Une session révoquée est détectée au premier appel protégé (401 → déconnexion et page de connexion). « Mon compte » appelle `GET /api/account/me` à l'ouverture de la page seulement.
 
@@ -541,7 +547,7 @@ Voir aussi le § 5 de `docs/fonctionnel/mvp.md`. Ces points ne changent pas le p
 1. **Blocage** : avec Identity, le 5e échec bloque déjà le compte et la réponse l'indique ; le scénario parle de la 6e tentative. Comportement implémenté compatible, à confirmer.
 2. **Durée de session** : 60 min sans « rester connecté ». Acceptable pour des bénévoles qui gèrent des demandes ?
 3. **Admins suivants (R22, Q11)** : script SQL documenté au MVP (`sqlcmd -I`) ; suffisant ?
-4. **Actualité dépubliée puis republiée** : garde-t-elle sa date de publication d'origine ? Proposition : oui (`FirstPublishedAt`).
+4. ~~**Actualité dépubliée puis republiée** : garde-t-elle sa date de publication d'origine ?~~ **Tranché** (ADR 0022, accepté le 24/11/2026) : oui, `PublishedAt` posée à la première publication et conservée.
 5. **App Service et images Docker** : le cahier demande une image Docker en CI et App Service. L'offre F1 ne permettrait pas (à vérifier en S3) d'exécuter un conteneur personnalisé ; le plan B1 le permet mais coûte environ 13 € par mois (objectif O4). Proposition : publier l'image dans GHCR (preuve de savoir-faire, `docker compose`) et déployer le code publié sur F1, sauf décision contraire en S3.
 6. **Risques de sécurité différés ou acceptés** (§ 9) : accepter que la limitation de débit attende S3, et accepter l'énumération des comptes via `account_locked`.
 7. **Messages de validation en deux temps** à l'inscription (téléphone puis mot de passe) : acceptable, compensé par la validation côté front ?

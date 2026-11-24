@@ -1,0 +1,142 @@
+# Intégration continue (CI) : compile, teste et construit les images à chaque push et pull request vers main.
+# Aucun déploiement ici (ce sera cd.yml, S3) et aucun secret requis.
+# Reproduire en local : docs/technique/exploitation.md § 10.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # Un changement de documentation seule ne relance pas 10 minutes de build et de tests.
+    paths-ignore: ['docs/**', '**/*.md']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['docs/**', '**/*.md']
+  # Bouton « Run workflow » dans l'onglet Actions (relancer sans nouveau commit).
+  workflow_dispatch:
+
+# Moindre privilège : le GITHUB_TOKEN du run peut seulement lire le dépôt (checkout).
+permissions:
+  contents: read
+
+# Un nouveau push sur la même branche (ou PR) annule le run précédent, devenu obsolète.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  backend:
+    name: .NET (build et tests)
+    runs-on: ubuntu-latest
+    # L'image SQL Server tirée par Testcontainers pèse environ 1,5 Go : marge pour le premier téléchargement.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      # Installe le SDK demandé par global.json (10.0.100, rollForward latestFeature) : même SDK que sur les postes.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Pas de packages.lock.json dans le dépôt : le cache intégré de setup-dotnet l'exige, d'où actions/cache.
+      # La clé change dès qu'une version de paquet change (versions centralisées dans Directory.Packages.props).
+      - name: Cache NuGet
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'nuget.config', 'Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restauration
+        run: dotnet restore Aaas.slnx
+
+      # -warnaserror : un avertissement du compilateur ou d'un analyseur (CA, IDE, xUnit) fait échouer la CI.
+      - name: Compilation (avertissements = erreurs)
+        id: build
+        run: dotnet build Aaas.slnx -c Release --no-restore -warnaserror
+
+      # Un step par projet : l'onglet du run montre directement QUEL projet échoue.
+      # « !cancelled() && build réussi » : les autres projets sont testés même si l'un échoue,
+      # mais rien n'est lancé si la compilation a échoué.
+      - name: Tests Domain
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test tests/Aaas.Domain.Tests/Aaas.Domain.Tests.csproj -c Release --no-build --logger "trx;LogFileName=Aaas.Domain.Tests.trx" --results-directory TestResults
+
+      - name: Tests Application
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test tests/Aaas.Application.Tests/Aaas.Application.Tests.csproj -c Release --no-build --logger "trx;LogFileName=Aaas.Application.Tests.trx" --results-directory TestResults
+
+      - name: Tests Infrastructure
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test tests/Aaas.Infrastructure.Tests/Aaas.Infrastructure.Tests.csproj -c Release --no-build --logger "trx;LogFileName=Aaas.Infrastructure.Tests.trx" --results-directory TestResults
+
+      # Testcontainers lance SQL Server dans le Docker du runner (préinstallé sur ubuntu-latest).
+      - name: Tests d'intégration API (Testcontainers, SQL Server)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test tests/Aaas.Api.IntegrationTests/Aaas.Api.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=Aaas.Api.IntegrationTests.trx" --results-directory TestResults
+
+      # always() : on veut les résultats surtout quand des tests échouent.
+      - name: Publier les résultats de tests (TRX)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: resultats-tests-dotnet
+          path: TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 14
+
+  front:
+    name: Angular (lint, tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - uses: actions/checkout@v7
+
+      # Version de Node lue dans front/.nvmrc ; cache du dossier de téléchargement npm, indexé sur le lockfile.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: front/.nvmrc
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      # npm ci : installe exactement package-lock.json et échoue s'il ne correspond pas à package.json.
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run test:ci
+      - run: npm run build
+
+  docker:
+    name: Images Docker (sans publication)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # Buildx (BuildKit) permet d'exporter le cache des couches vers le cache GitHub Actions (type=gha).
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Image API
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: src/Aaas.Api/Dockerfile
+          tags: aaas-api:ci
+          push: false
+          # scope distinct par image, sinon les deux caches s'écrasent ; mode=max garde aussi les couches du stage build.
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Image front
+        uses: docker/build-push-action@v7
+        with:
+          context: front
+          tags: aaas-front:ci
+          push: false
+          cache-from: type=gha,scope=front
+          cache-to: type=gha,scope=front,mode=max

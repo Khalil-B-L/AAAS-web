@@ -25,12 +25,12 @@ describe('Identité de l’association (logo, nom)', () => {
     expect(img.getAttribute('width')).toBe('52'); // 48 × 466 / 429 = 52,1
   });
 
-  it('en-tête : logo et sigle dans le lien vers les événements', async () => {
+  it('en-tête : logo et sigle dans le lien vers l’accueil (/ → actualités)', async () => {
     const fixture = TestBed.createComponent(Header);
     await fixture.whenStable();
 
     const brand = query<HTMLAnchorElement>(fixture, 'a.brand');
-    expect(brand.getAttribute('href')).toBe('/evenements');
+    expect(brand.getAttribute('href')).toBe('/');
     expect(brand.querySelector('img')?.alt).toBe(APP_INFO.legalName);
     expect(brand.textContent?.trim()).toBe('A.A.A.S');
   });

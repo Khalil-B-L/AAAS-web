@@ -1,4 +1,5 @@
 using Aaas.Domain.Events;
+using Aaas.Domain.News;
 using Aaas.Domain.Reservations;
 using Aaas.Domain.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,8 @@ public interface IAppDbContext
     DbSet<AssociationSettings> AssociationSettings { get; }
 
     DbSet<Reservation> Reservations { get; }
+
+    DbSet<NewsArticle> News { get; }
 
     /// <summary>
     /// Pour rejouer une opération après un conflit de rowversion : <c>ChangeTracker.Clear()</c> oublie les entités

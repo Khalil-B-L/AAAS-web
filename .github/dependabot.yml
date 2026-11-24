@@ -1,0 +1,54 @@
+# Dependabot : ouvre des pull requests de mise à jour, que la CI (ci.yml) vérifie avant fusion.
+# Une fois par semaine, mises à jour regroupées pour limiter le nombre de PR.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dotnet:
+        patterns: ['*']
+    ignore:
+      # Le projet reste sur .NET 10 LTS : pas de passage automatique à une version majeure (11, 12...).
+      - dependency-name: 'Microsoft.AspNetCore.*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'Microsoft.EntityFrameworkCore*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'Microsoft.Extensions.*'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: npm
+    directory: /front
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Les paquets Angular doivent monter ensemble (même version majeure et mineure).
+      angular:
+        patterns: ['@angular/*', '@angular-devkit/*', 'angular-eslint']
+      outils:
+        patterns: ['*']
+        exclude-patterns: ['@angular/*', '@angular-devkit/*', 'angular-eslint']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  # Images de base des Dockerfile. L'image SQL Server (docker-compose.yml) n'est volontairement pas suivie :
+  # son tag doit rester identique à celui de tests/Aaas.Api.IntegrationTests/Support/SqlServerFixture.cs.
+  - package-ecosystem: docker
+    directories: ['/src/Aaas.Api', '/front']
+    schedule:
+      interval: weekly
+    ignore:
+      # Node : rester sur la LTS 24 (front/.nvmrc) ; .NET : rester sur 10 LTS.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'dotnet/*'
+        update-types: ['version-update:semver-major']

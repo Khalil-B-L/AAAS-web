@@ -494,3 +494,61 @@ Dix lignes = dix boutons « Confirmer » identiques pour un lecteur d'écran. `[
 ### Exercice (facultatif)
 
 Dans « Inscrits », mettre à jour la ligne **sans relire toute la liste** après un succès : remplacer l'élément par la réponse de l'API (`AdminReservationDto`) et le déplacer dans le bon groupe selon son `status` (indice : `registrants.update(...)`), puis comparer avec la solution actuelle (`reload()`) en nombre d'appels et en simplicité.
+
+## 19. Actualités : interpolation contre `innerHTML`, aperçu réactif, composant de présentation, route vide
+
+### Interpolation contre `[innerHTML]`
+
+- **C'est quoi** : `{{ texte }}` insère un **nœud texte**, et `<script>` s'affiche alors tel quel. `[innerHTML]` interprète du HTML, après le `DomSanitizer` ; `bypassSecurityTrustHtml` désactive ce dernier.
+- **Pourquoi ici** : le texte d'une actualité est saisi par un admin et affiché à tous, c'est le cas d'école de la XSS stockée. On l'affiche donc **uniquement** par interpolation (ADR 0023). Une règle ESLint interdit `[innerHTML]` et `bypassSecurityTrust*` dans tout le front. Détails : [`securite-web-xss.md`](securite-web-xss.md).
+- **Analogie .NET** : `@Model.Texte` en Razor (encodé) contre `@Html.Raw(...)`.
+
+### Paragraphes sans HTML : fonction pure + `@for`
+
+```html
+@for (paragraph of paragraphs(); track $index) {
+  <p class="news-article__paragraph">{{ paragraph }}</p>
+}
+```
+
+`paragraphs = computed(() => toParagraphs(this.content()))` : la découpe est une fonction pure, testée sans DOM (`shared/news/paragraphs.ts`). `track $index` convient : un paragraphe n'a pas d'identifiant, et la liste est recalculée à chaque frappe dans l'aperçu.
+
+### Aperçu qui suit la saisie : `toSignal(form.valueChanges)`
+
+```ts
+protected readonly values = toSignal(this.form.valueChanges.pipe(map(() => this.form.getRawValue())), {
+  initialValue: this.form.getRawValue(),
+});
+```
+
+- **C'est quoi** : `toSignal` transforme un `Observable` en signal. Le template lit `values().title` ; à chaque frappe, `valueChanges` émet, le signal change et la vue `OnPush` se redessine. On n'a rien d'autre à déclencher.
+- `initialValue` : un signal a toujours une valeur, alors qu'un `Observable` n'émet qu'au premier changement.
+- `getRawValue()` plutôt que la valeur émise : elle inclut les champs désactivés et a un type complet (pas de `Partial`).
+- **Analogie .NET** : un `IObservable<T>` (Rx.NET) exposé comme une propriété qu'un binding WPF suit.
+- Le formulaire reste dans le DOM pendant l'aperçu (`[hidden]`, pas `@if`) : la saisie, l'état « modifié » et la garde de sortie sont conservés.
+
+### Composant de présentation réutilisé
+
+`<app-news-article [title] [content] [publishedAt] [headingLevel]>` ne fait **aucun appel HTTP** : il reçoit des `input()` et affiche. Il sert au détail public **et** à l'aperçu admin, ce qui garantit le même rendu. `headingLevel` vaut 2 dans l'aperçu, parce que la page admin a déjà son `<h1>` (hiérarchie de titres accessible).
+
+### Validateur qui compte comme le serveur
+
+`trimmedText(max)` (`shared/forms/validators.ts`) renvoie `required` si le texte n'a que des espaces, et `maxlength` au-delà de `max` **après** `Trim` et `\r\n` → `\n`. `Validators.required` laisserait passer `"   "`, et `Validators.maxLength` compterait les espaces autour : le front contredirait l'API. Le compteur « 123 / 8 000 » utilise la même règle (`newsContentLength`).
+
+### Redirection de la route vide
+
+```ts
+{ path: '', pathMatch: 'full', redirectTo: 'actualites' }
+```
+
+`pathMatch: 'full'` est **obligatoire** sur la route vide. Par défaut (`'prefix'`), toute URL « commence par rien » : `/evenements` serait elle aussi redirigée. Les routes plus précises se déclarent avant les génériques : `actualites/nouvelle` avant `actualites/:id`, sinon « nouvelle » serait pris pour un identifiant.
+
+### Questions d'entretien
+
+1. **Pourquoi `pathMatch: 'full'` sur `''` ?** Sans lui, la redirection s'applique à toutes les URL (chacune a le préfixe vide).
+2. **Comment faire un aperçu « en direct » d'un reactive form ?** `toSignal(form.valueChanges, { initialValue })`, lu par un composant de présentation.
+3. **`[innerHTML]` est-il dangereux puisqu'Angular le nettoie ?** Il est moins dangereux que `bypassSecurityTrust`, mais le sanitizer laisse passer beaucoup de HTML. Pour un texte libre, l'interpolation est la seule option sans risque.
+
+### Exercice (facultatif)
+
+Ajoutez à l'aperçu un compteur de mots en `computed` sur `values().content`, et testez qu'il suit la saisie.

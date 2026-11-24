@@ -202,7 +202,7 @@ describe('pages publiques', () => {
       api.get.mockReturnValue(throwError(() => problem(404, 'not_found', 'Contenu introuvable.')));
       const fixture = await render('00000000-0000-0000-0000-00000000dead');
       expect(text(fixture)).toContain('Contenu introuvable');
-      expect(text(fixture)).toContain('Retour aux événements');
+      expect(text(fixture)).toContain("Retour à l'accueil");
     });
 
     it("affiche « Contenu introuvable » sans appeler l'API pour un identifiant mal formé", async () => {

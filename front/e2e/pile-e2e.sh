@@ -5,6 +5,7 @@
 #   bash front/e2e/pile-e2e.sh up        construit les images, démarre, crée les données de test
 #   bash front/e2e/pile-e2e.sh parcours  lance le parcours navigateur (Edge ou Chrome sans interface)
 #   bash front/e2e/pile-e2e.sh reservations  parcours HTTP des réservations (demande, 409, « ma demande », annulation)
+#   bash front/e2e/pile-e2e.sh news      parcours HTTP des actualités (créer, publier, lire, 409, dépublier, supprimer)
 #   bash front/e2e/pile-e2e.sh down      supprime tout (conteneurs, réseau, images aaas-api:e2e et aaas-front:e2e)
 #
 # À lancer depuis la racine du dépôt, sous Git Bash ou Linux. Détails : docs/technique/exploitation.md.
@@ -179,6 +180,48 @@ reservations() {
   echo "Parcours réservations : OK"
 }
 
+# Actualités (US-E1, US-B1, US-B2), à travers nginx : créer, brouillon invisible, publier, lire anonymement,
+# texte malveillant renvoyé à l'identique, 409, dépublier → 404, supprimer. Rejouable (titre aléatoire, suppression en fin).
+news() {
+  local token news_id title
+  token=$(curl -fsS -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' \
+    -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$(cat "$STATE_DIR/admin-password")\"}" | json_field accessToken)
+  local auth=(-H "Authorization: Bearer $token")
+  local json=(-H 'Content-Type: application/json')
+  title="AG e2e $(random 3)"
+
+  expect_status 401 "visiteur sur /api/admin/news" "$BASE/api/admin/news"
+  # Le texte contient <script> et <img onerror> : l'API doit le renvoyer tel quel (le front l'affiche en texte).
+  expect_status 201 "création (brouillon)" -X POST "${auth[@]}" "${json[@]}" \
+    -d "{\"title\":\"$title\",\"content\":\"Premier paragraphe.\\n\\n<script>alert(1)</script><img src=x onerror=alert(1)>\"}" \
+    "$BASE/api/admin/news"
+  news_id=$(json_field id < "$STATE_DIR/last-body")
+  grep -qi '^cache-control: no-store' "$STATE_DIR/last-headers" || { echo "ÉCHEC : Cache-Control no-store absent" >&2; return 1; }
+  echo "    OK Cache-Control: no-store"
+  expect_status 404 "brouillon invisible du public" "$BASE/api/news/$news_id"
+  expect_status 404 "identifiant mal formé (même 404, anonyme)" "$BASE/api/news/abc"
+  expect_status 200 "publication" -X POST "${auth[@]}" "$BASE/api/admin/news/$news_id/publish"
+  expect_status 409 "deuxième publication (news_state_changed)" -X POST "${auth[@]}" "$BASE/api/admin/news/$news_id/publish"
+  expect_status 200 "liste publique" "$BASE/api/news"
+  grep -q "$title" "$STATE_DIR/last-body" || { echo "ÉCHEC : actualité absente de la liste publique" >&2; return 1; }
+  echo "    OK présente dans la liste publique"
+  expect_status 200 "détail public" "$BASE/api/news/$news_id"
+  grep -q '<script>alert(1)</script><img src=x onerror=alert(1)>' "$STATE_DIR/last-body" \
+    || { echo "ÉCHEC : texte modifié par le serveur" >&2; return 1; }
+  echo "    OK texte renvoyé à l'identique (aucun encodage serveur)"
+  expect_status 409 "modification avec une version périmée (concurrent_update)" -X PUT "${auth[@]}" "${json[@]}" \
+    -d "{\"title\":\"$title\",\"content\":\"x\",\"version\":\"AAAAAAAAAAA=\"}" "$BASE/api/admin/news/$news_id"
+  expect_status 200 "modification avec la bonne version" -X PUT "${auth[@]}" "${json[@]}" \
+    -d "{\"title\":\"$title\",\"content\":\"Texte corrige (ASCII : curl sous Git Bash n envoie pas l UTF-8 des arguments).\",\"version\":\"$(curl -fsS "${auth[@]}" "$BASE/api/admin/news/$news_id" | json_field version)\"}" \
+    "$BASE/api/admin/news/$news_id"
+  expect_status 200 "dépublication" -X POST "${auth[@]}" "$BASE/api/admin/news/$news_id/unpublish"
+  expect_status 404 "dépubliée → 404 public" "$BASE/api/news/$news_id"
+  expect_status 204 "suppression" -X DELETE "${auth[@]}" "$BASE/api/admin/news/$news_id"
+  expect_status 404 "deuxième suppression" -X DELETE "${auth[@]}" "$BASE/api/admin/news/$news_id"
+  expect_status 200 "accueil SPA (/) servi par nginx" "$BASE/"
+  echo "Parcours actualités : OK"
+}
+
 down() {
   docker rm -f aaas-e2e-front aaas-e2e-api aaas-e2e-sql >/dev/null 2>&1 || true
   docker network rm aaas-e2e >/dev/null 2>&1 || true
@@ -191,9 +234,9 @@ down() {
 
 # Liste blanche : l'argument n'est jamais exécuté tel quel (« pile-e2e.sh rm » ou une faute de frappe échouent proprement).
 case "${1:-}" in
-  up | parcours | reservations | down) "$1" ;;
+  up | parcours | reservations | news | down) "$1" ;;
   *)
-    echo "Usage : pile-e2e.sh up|parcours|reservations|down" >&2
+    echo "Usage : pile-e2e.sh up|parcours|reservations|news|down" >&2
     exit 2
     ;;
 esac

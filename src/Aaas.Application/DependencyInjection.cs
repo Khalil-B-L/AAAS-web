@@ -1,5 +1,6 @@
 using Aaas.Application.Accounts;
 using Aaas.Application.Events;
+using Aaas.Application.News;
 using Aaas.Application.Reservations;
 using Aaas.Application.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,8 @@ public static class DependencyInjection
         services.AddScoped<IExpireDueReservations>(sp => sp.GetRequiredService<ReservationExpiryService>());
         services.AddScoped<MemberReservationService>();
         services.AddScoped<AdminReservationService>();
+        services.AddScoped<PublicNewsService>();
+        services.AddScoped<AdminNewsService>();
         return services;
     }
 }

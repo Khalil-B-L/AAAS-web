@@ -14,7 +14,7 @@ import { RouterLink } from '@angular/router';
     <section class="page">
       <h1>Contenu introuvable</h1>
       <p>Cette page n'existe pas ou n'est plus disponible.</p>
-      <a mat-flat-button routerLink="/evenements">Retour aux événements</a>
+      <a mat-flat-button routerLink="/">Retour à l'accueil</a>
     </section>
   `,
 })

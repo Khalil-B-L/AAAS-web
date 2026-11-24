@@ -94,6 +94,52 @@ namespace Aaas.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Aaas.Domain.News.NewsArticle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "PublishedAt", "Id")
+                        .HasDatabaseName("IX_News_Status_PublishedAt");
+
+                    b.ToTable("News", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_News_PublishedAt", "[Status] = 1 OR [PublishedAt] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_News_Status", "[Status] IN (1, 2)");
+                        });
+                });
+
             modelBuilder.Entity("Aaas.Domain.Reservations.Reservation", b =>
                 {
                     b.Property<Guid>("Id")

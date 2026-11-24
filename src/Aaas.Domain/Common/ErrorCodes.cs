@@ -71,6 +71,11 @@ public static class ErrorCodes
 
     /// <summary>RG-08 : événement gratuit, aucun paiement à enregistrer (tâche B).</summary>
     public const string PaymentNotApplicable = "payment_not_applicable";
+
+    // Actualités (ADR 0022 § 6).
+
+    /// <summary>Transition impossible depuis le statut actuel (publier une publiée, dépublier un brouillon), en 409.</summary>
+    public const string NewsStateChanged = "news_state_changed";
 }
 
 /// <summary>Noms des extensions ajoutées aux ProblemDetails par <see cref="BusinessRuleException.Details"/>.</summary>

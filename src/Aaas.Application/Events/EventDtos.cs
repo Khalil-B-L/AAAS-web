@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Aaas.Application.Common;
 using Aaas.Application.Common.Validation;
 using Aaas.Domain.Events;
 
@@ -64,18 +65,7 @@ public enum EventPeriod
     All,
 }
 
-public class PagingQuery
-{
-    public const int MaxPage = 10_000;
-
-    // Borne haute : sans elle, (page - 1) * pageSize déborde pour une page énorme (Skip négatif → 500).
-    [Range(1, MaxPage, ErrorMessage = "Le numéro de page doit être compris entre 1 et 10 000.")]
-    public int Page { get; init; } = 1;
-
-    [Range(1, 50, ErrorMessage = "Le nombre d'éléments par page doit être compris entre 1 et 50.")]
-    public int PageSize { get; init; } = 20;
-}
-
+// PagingQuery : Common/PagingQuery.cs (20 par défaut).
 public sealed class PublicEventListQuery : PagingQuery;
 
 public sealed class AdminEventListQuery : PagingQuery

@@ -1,5 +1,6 @@
 using Aaas.Application.Abstractions;
 using Aaas.Domain.Events;
+using Aaas.Domain.News;
 using Aaas.Domain.Reservations;
 using Aaas.Domain.Settings;
 using Aaas.Infrastructure.Identity;
@@ -18,6 +19,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AssociationSettings> AssociationSettings => Set<AssociationSettings>();
 
     public DbSet<Reservation> Reservations => Set<Reservation>();
+
+    public DbSet<NewsArticle> News => Set<NewsArticle>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

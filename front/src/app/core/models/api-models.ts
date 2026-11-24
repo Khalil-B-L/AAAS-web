@@ -292,3 +292,57 @@ export interface EventRegistrantsDto {
   /** Refusées, expirées, annulées : la plus récente demande d'abord. */
   others: AdminReservationDto[];
 }
+
+// ---------- Actualités (ADR 0022, 0023) ----------
+
+export type NewsStatus = 'Draft' | 'Published';
+
+/** Carte de la liste publique. `excerpt` : 200 caractères au plus, terminé par « … » s'il est coupé. */
+export interface NewsSummaryDto {
+  id: string;
+  title: string;
+  excerpt: string;
+  publishedAt: IsoDateString;
+}
+
+/** Détail public : `content` est du TEXTE BRUT (paragraphes séparés par une ligne vide), jamais du HTML. */
+export interface NewsDetailDto {
+  id: string;
+  title: string;
+  content: string;
+  publishedAt: IsoDateString;
+}
+
+export interface AdminNewsSummaryDto {
+  id: string;
+  title: string;
+  status: NewsStatus;
+  /** Première publication ; conservée après une dépublication ; null si jamais publiée. */
+  publishedAt: IsoDateString | null;
+  updatedAt: IsoDateString;
+}
+
+export interface AdminNewsDto {
+  id: string;
+  title: string;
+  content: string;
+  status: NewsStatus;
+  publishedAt: IsoDateString | null;
+  createdAt: IsoDateString;
+  updatedAt: IsoDateString;
+  version: string;
+}
+
+export interface NewsInput {
+  title: string;
+  content: string;
+}
+
+export interface UpdateNewsRequest extends NewsInput {
+  version: string;
+}
+
+export interface AdminNewsListQuery {
+  status: NewsStatus | null;
+  page: number;
+}

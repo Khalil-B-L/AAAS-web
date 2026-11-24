@@ -29,6 +29,5 @@ internal static class EventQueries
         ? events.OrderBy(e => e.StartsAt).ThenBy(e => e.Id)
         : events.OrderByDescending(e => e.StartsAt).ThenBy(e => e.Id);
 
-    public static IQueryable<Event> Page(this IQueryable<Event> events, int page, int pageSize) =>
-        events.Skip((page - 1) * pageSize).Take(pageSize);
+    // Page : Common/QueryablePaging.cs (générique).
 }

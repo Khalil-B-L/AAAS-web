@@ -1,7 +1,8 @@
 # API — AAAS
 
 > Tenu par l'agent `expert-technique`. Endpoints, rôle requis, entrées, sorties, codes d'erreur.
-> État : **réservations, tâche B** (24/11/2026) : comptes ; événements côté admin ; numéro de contact ; consultation publique ; demande, suivi et annulation d'une place par le membre ; traitement par l'admin (demandes à traiter, inscrits, confirmer, refuser, annuler, « Payée »). Tâche C (expiration automatique) : à venir.
+> État : **actualités** (24/11/2026) : comptes ; événements côté admin ; numéro de contact ; consultation publique ; réservations (membre, admin, expiration) ; **actualités** (consultation publique, administration).
+> Pagination : taille par défaut 20, sauf `GET /api/news` (10).
 
 ## Conventions
 
@@ -436,6 +437,81 @@ Pas de `canCancel` / `cancellableUntil` du membre : l'admin a ses propres règle
 - **Réponses** : 200 ; 404 ; 409 `concurrent_update` (second conflit d'écriture d'affilée, très rare).
 
 Effets sur les événements (deviennent atteignables avec les vraies confirmations) : `PUT /api/admin/events/{id}` → `capacity_below_reserved` (R11) et `registrants_warning` (R12) ; `POST .../unpublish` → `event_has_active_reservations` (R14), levé de nouveau dès que l'admin annule les réservations actives.
+
+## Actualités — consultation publique (US-B1, US-B2)
+
+Contenu en **texte brut** (ADR 0023) : `title` et `content` sont renvoyés **exactement** comme ils ont été enregistrés (après `Trim` et `\r\n` → `\n`), **sans aucun encodage HTML** : `<script>` reste `<script>` dans le JSON. C'est le front qui l'affiche en texte (interpolation Angular). Les paragraphes sont séparés par une ligne vide (`\n\n`).
+
+**`NewsSummaryDto`** (carte de liste) : `id` (GUID), `title`, `excerpt`, `publishedAt` (date UTC).
+**`NewsDetailDto`** (détail) : `id`, `title`, `content`, `publishedAt`.
+
+| Champ | Note |
+|---|---|
+| `excerpt` | calculé (pas stocké) : début du texte, retours à la ligne remplacés par des espaces, **200 caractères au plus** coupés sur une fin de mot, suivi de « … » s'il est coupé ; un mot de plus de 200 caractères est coupé net ; jamais un émoji coupé en deux (`NewsRules.Excerpt`) |
+| `publishedAt` | date de la **première** publication (conservée si l'actualité est dépubliée puis republiée) ; toujours en UTC, le front affiche le **jour de Tunis** (23:30Z le 5 → « 6 décembre ») |
+
+### `GET /api/news?page=&pageSize=` — actualités publiées
+
+- **Accès** : anonyme (un jeton invalide ou expiré est ignoré : pas de 401).
+- **Contenu** : actualités au statut **Publiée** uniquement, `publishedAt` décroissante puis `id` (ordre stable d'une page à l'autre). **Taille par défaut : 10** (50 au plus).
+- **Page au-delà de la dernière** : `200` avec `items: []` et le vrai `totalCount` (même convention que les autres listes) ; le front affiche « Cette page ne contient plus d'actualité » et un lien vers la première page.
+- **Réponses** : 200 `PagedResult<NewsSummaryDto>` ; 400 `validation_failed` (`page`, `pageSize`).
+- **Cache** : pas de `no-store` sur une réponse réussie (contenu public) ; une dépublication est visible au prochain appel (aucun cache côté serveur).
+
+### `GET /api/news/{id}` — détail d'une actualité
+
+| Code | Quand |
+|---|---|
+| 200 `NewsDetailDto` | Actualité publiée. |
+| 404 `not_found` « Contenu introuvable. » | Brouillon (jamais publiée **ou dépubliée**), supprimée, identifiant inconnu ou **mal formé** (`/api/news/abc`, route de repli anonyme `NewsController.GetMalformedId`) : **même corps** dans tous les cas, visiteur ou connecté. |
+
+Remarque : comme tout 404 produit par le gestionnaire d'erreurs d'ASP.NET Core, ce 404 porte `Cache-Control: no-cache,no-store` (le framework vide les en-têtes de cache des réponses d'erreur).
+
+## Actualités — administration (US-E1)
+
+Toutes les routes exigent le rôle **Admin** (visiteur 401, membre 403) et portent `Cache-Control: no-store` (erreurs comprises). Identifiant mal formé (`/api/admin/news/abc`, en GET/PUT/DELETE, ou `.../abc/publish|unpublish`) : visiteur 401, membre 403, admin **404** « Actualité introuvable. » (`AdminNewsController.MalformedId`).
+
+**`AdminNewsSummaryDto`** (ligne de liste) : `id`, `title`, `status` (`"Draft"` ou `"Published"`), `publishedAt` (première publication, ou `null` si jamais publiée ; **un brouillon dépublié garde sa date**), `updatedAt`.
+**`AdminNewsDto`** (fiche) : `id`, `title`, `content`, `status`, `publishedAt`, `createdAt`, `updatedAt`, `version` (Base64 du `rowversion`, à renvoyer au `PUT`).
+
+**Entrée** `{ "title": "...", "content": "..." }` (+ `"version"` pour le `PUT`) :
+
+| Champ | Règle (comptée **après** `Trim` et `\r\n` → `\n`) | Message 400 |
+|---|---|---|
+| `title` | obligatoire, 200 caractères au plus | « Le titre est obligatoire. » / « Le titre ne doit pas dépasser 200 caractères. » |
+| `content` | obligatoire, **8 000** caractères au plus | « Le texte est obligatoire. » / « Le texte ne doit pas dépasser 8 000 caractères. » |
+| `version` (`PUT`) | obligatoire, Base64 de 8 octets | « La version de la fiche est obligatoire. Rechargez-la. » ; mal formée → 400 `errors.version` |
+
+### `GET /api/admin/news?status=&page=&pageSize=` — liste admin
+
+Toutes les actualités (ou celles du `status` demandé : `Draft`, `Published`), **dernière modification d'abord** puis `id`, 20 par défaut. Le texte n'est pas renvoyé. 200 `PagedResult<AdminNewsSummaryDto>` ; 400.
+
+### `GET /api/admin/news/{id}` — fiche
+
+200 `AdminNewsDto` ; 404 « Actualité introuvable. ».
+
+### `POST /api/admin/news` — créer (en brouillon)
+
+201 `AdminNewsDto` (`status: "Draft"`, `publishedAt: null`), en-tête `Location: /api/admin/news/{id}` ; 400 `errors.title` / `errors.content`.
+
+### `PUT /api/admin/news/{id}` — modifier
+
+Brouillon ou publiée ; `publishedAt` **jamais** modifiée ; une publiée modifiée est visible tout de suite. Ordre des contrôles : 404 → 409 `concurrent_update` (version périmée) → 400 (on ne signale pas une erreur de saisie sur une fiche périmée). 200 `AdminNewsDto` avec la **nouvelle** `version`.
+
+### `POST /api/admin/news/{id}/publish` et `/unpublish` — publier, dépublier
+
+Sans corps, sans `version` (actions). Publier : Brouillon → Publiée, `publishedAt` posée **seulement à la première publication**. Dépublier : Publiée → Brouillon, `publishedAt` conservée.
+
+| Code | Quand |
+|---|---|
+| 200 `AdminNewsDto` | transition faite (nouvelle `version`) |
+| 404 | inconnue |
+| 409 `news_state_changed` | « Cette actualité est déjà publiée. » (publier une publiée) / « Cette actualité n'est pas publiée. » (dépublier un brouillon) |
+| 409 `concurrent_update` | un autre admin a écrit sur la fiche entre la lecture et l'enregistrement (rare) |
+
+### `DELETE /api/admin/news/{id}` — supprimer
+
+Suppression **définitive**, depuis les deux statuts (R18), sans `version`. 204 ; 404 si déjà supprimée ; 409 `concurrent_update` si un autre admin a écrit entre-temps.
 
 ## Supervision
 
